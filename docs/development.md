@@ -138,3 +138,22 @@ Run `make screenshots` to rebuild the light and dark previews in `docs/images/`.
 `ci.yml` runs strict formatting and core tests. `package.yml` builds and verifies the arm64 app on pull requests and main, and can be dispatched manually. A push to `main` also publishes a GitHub Release whose tag is the build date plus the commit's short revision in `Asia/Shanghai` time, such as `v2026.10.07-3e5e7de`; the app's `CFBundleShortVersionString` carries the same value and `CFBundleVersion` the numeric stamp. Releases attach the ZIP and its SHA-256 checksum, and a re-run of the same commit replaces those assets rather than duplicating the release. Packaging no longer triggers on `v*` tags. No credential secrets are required. Before public distribution, configure Developer ID signing and notarization, including stapling and Gatekeeper validation.
 
 The minimum deployment target is macOS 13; execution on an actual macOS 13 machine and Developer ID signing/notarization remain release checks. Automatic refresh currently uses a timer; immediate network-recovery notifications are a follow-up improvement.
+
+
+### Full service details
+
+Long quota listings must not be put in AppKit tooltips, which cannot scroll and can
+extend offscreen. `hoverSummary` contains only the service, status, and navigation
+hint. Clicking a service heading or usage value switches the existing popover to
+`UsageDetailsView`: 380 points wide, with a wrapping/selectable scroll view capped at
+520 points or the screen-derived content limit, plus Back and targeted Refresh.
+A footer hint and short hover hint expose this action; VoiceOver buttons name the
+service and retain the percentage as their value. The hosting controller explicitly
+tracks preferred content size when changing views. The view observes AppStore so
+readings continue to update while open. Settings retain full text in their existing
+scroll view. Menu bar hover text also stays short.
+
+The native regression uses 60 fictional metrics to verify bounded fitting size,
+full text retention, short hover text, and scrolling to the document's bottom.
+Export a fictional details preview with `--export-screenshot PATH --details`; no
+credentials or provider reads are used.

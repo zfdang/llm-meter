@@ -252,6 +252,12 @@ public enum L10n {
     "Could not save %@. Check folder permissions.": "无法保存 %@。请检查文件夹权限。",
     "The configured %@ executable is unavailable.": "配置的 %@ 可执行文件不可用。",
     "%@ was not found. Choose its executable in Settings.": "未找到 %@。请在设置中选择其可执行文件。",
+    "Click for full details": "点击查看完整详情",
+    "Click a service name or usage value for details.": "点击服务名称或用量查看详情。",
+    "View %@ details": "查看 %@ 详情",
+    "Back": "返回",
+    "Usage details": "用量详情",
+    "Click to view usage": "点击查看用量",
   ]
 }
 

@@ -7,8 +7,20 @@ struct UsagePanel: View {
   @ObservedObject var store: AppStore
   var maximumContentHeight: () -> CGFloat
   var openSettings: () -> Void
+  @State private var detailProvider: ProviderID?
 
   var body: some View {
+    if let detailProvider {
+      UsageDetailsView(
+        store: store, provider: detailProvider,
+        maximumContentHeight: maximumContentHeight
+      ) { self.detailProvider = nil }
+    } else {
+      overview
+    }
+  }
+
+  private var overview: some View {
     VStack(spacing: 0) {
       HStack(spacing: 10) {
         Image(nsImage: MenuBarController.icon(size: 22))
@@ -69,6 +81,10 @@ struct UsagePanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16).padding(.top, 10)
         .help(store.panelUpdateDetails)
+      Text(L10n.text("Click a service name or usage value for details."))
+        .font(.system(size: 10)).foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.top, 4)
       HStack(spacing: 8) {
         action(
           store.refreshing ? L10n.text("Refreshing…") : L10n.text("Refresh"),
@@ -130,7 +146,7 @@ struct UsagePanel: View {
               .frame(maxWidth: .infinity, alignment: .leading)
             window(.antigravity, period: .fiveHours, scope: scope)
             window(.antigravity, period: .weekly, scope: scope)
-          }.padding(.vertical, 10).help(store.tooltip(.antigravity))
+          }.padding(.vertical, 10).help(store.hoverSummary(.antigravity))
         }
       } else {
         ForEach(store.antigravityModels) { metric in
@@ -143,13 +159,15 @@ struct UsagePanel: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 5) {
-              value(store.modelLabel(metric), tone: store.tone(.antigravity, metric: metric))
+              value(
+                store.modelLabel(metric), tone: store.tone(.antigravity, metric: metric),
+                provider: .antigravity)
               Text(UsageDisplay.resetCountdown(metric.resetAt, now: store.now)).font(
                 .system(size: 10)
               )
               .foregroundStyle(.secondary)
             }
-          }.padding(.vertical, 10).help(store.tooltip(.antigravity))
+          }.padding(.vertical, 10).help(store.hoverSummary(.antigravity))
         }
       }
     }
@@ -177,7 +195,7 @@ struct UsagePanel: View {
           VStack(alignment: .trailing, spacing: 5) {
             value(
               store.metricLabel(.copilot, metric: metric),
-              tone: store.tone(.copilot, metric: metric))
+              tone: store.tone(.copilot, metric: metric), provider: .copilot)
             if !metric.unlimited {
               Text(UsageDisplay.resetCountdown(metric.resetAt, now: store.now)).font(
                 .system(size: 10)
@@ -185,7 +203,7 @@ struct UsagePanel: View {
               .foregroundStyle(.secondary)
             }
           }
-        }.padding(.vertical, 10).help(store.tooltip(.copilot))
+        }.padding(.vertical, 10).help(store.hoverSummary(.copilot))
       }
     }
   }
@@ -193,8 +211,13 @@ struct UsagePanel: View {
   private func providerHeading(_ id: ProviderID) -> some View {
     let selected = store.settings.showUsage && store.settings.selectedProvider == id
     return HStack(spacing: 5) {
-      Text(id.name).font(.system(size: 13, weight: .medium)).fixedSize()
-        .help(store.tooltip(id))
+      Button {
+        detailProvider = id
+      } label: {
+        Text(id.name).font(.system(size: 13, weight: .medium)).fixedSize()
+      }.buttonStyle(.plain)
+        .help(store.hoverSummary(id))
+        .accessibilityLabel(L10n.format("View %@ details", id.name))
       Button {
         store.showProviderInMenuBar(id)
       } label: {
@@ -215,9 +238,15 @@ struct UsagePanel: View {
     }
   }
 
-  private func value(_ label: String, tone: UsageTone) -> some View {
-    Text(label).font(.system(size: 18, weight: .medium, design: .rounded)).monospacedDigit()
-      .foregroundStyle(usageColor(tone))
+  private func value(_ label: String, tone: UsageTone, provider: ProviderID) -> some View {
+    Button {
+      detailProvider = provider
+    } label: {
+      Text(label).font(.system(size: 18, weight: .medium, design: .rounded)).monospacedDigit()
+        .foregroundStyle(usageColor(tone))
+    }.buttonStyle(.plain).help(L10n.text("Click for full details"))
+      .accessibilityLabel(L10n.format("View %@ details", provider.name))
+      .accessibilityValue(label)
   }
 
   private func usageColor(_ tone: UsageTone) -> Color {
@@ -233,12 +262,12 @@ struct UsagePanel: View {
     VStack(alignment: .trailing, spacing: 5) {
       value(
         store.label(id, period: period, scope: scope),
-        tone: store.tone(id, metric: store.metric(id, period: period, scope: scope)))
+        tone: store.tone(id, metric: store.metric(id, period: period, scope: scope)), provider: id)
       Text(store.resetLabel(id, period: period, scope: scope)).font(.system(size: 10))
         .monospacedDigit().foregroundStyle(.secondary)
     }.frame(width: 105, alignment: .trailing)
-      .help(store.tooltip(id))
-      .accessibilityElement(children: .ignore)
+      .help(store.hoverSummary(id))
+      .accessibilityElement(children: .contain)
       .accessibilityLabel(
         "\(id.name), \(period == .fiveHours ? L10n.text("5 hours") : L10n.text("Weekly")), \(store.label(id, period: period, scope: scope)), \(store.resetLabel(id, period: period, scope: scope))"
       )
@@ -249,6 +278,44 @@ struct UsagePanel: View {
       Label(text, systemImage: symbol).font(.system(size: 11, weight: .medium))
         .frame(maxWidth: .infinity).padding(.vertical, 8).contentShape(Rectangle())
     }.buttonStyle(PanelActionStyle())
+  }
+}
+
+/// Full details stay inside the screen-positioned popover, with wrapping and scrolling.
+struct UsageDetailsView: View {
+  @ObservedObject var store: AppStore
+  let provider: ProviderID
+  var maximumContentHeight: () -> CGFloat
+  var back: () -> Void
+
+  var body: some View {
+    VStack(spacing: 0) {
+      HStack(spacing: 10) {
+        Button(action: back) {
+          Label(L10n.text("Back"), systemImage: "chevron.left")
+        }.buttonStyle(.plain)
+        Spacer()
+        VStack(alignment: .trailing, spacing: 3) {
+          Text(provider.name).font(.headline)
+          Text(L10n.text("Usage details")).font(.caption).foregroundStyle(.secondary)
+        }
+      }.padding(16)
+      Divider()
+      ScrollView {
+        Text(store.detailsText(provider)).font(.system(size: 12))
+          .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+      }.frame(height: min(520, maximumContentHeight()))
+      Divider()
+      HStack {
+        Text(store.updateLabel(provider)).font(.caption).foregroundStyle(.secondary)
+        Spacer()
+        Button(L10n.text("Refresh")) { store.refresh(provider) }
+          .disabled(
+            store.states[provider]?.refreshing == true
+              || store.settings.services.first(where: { $0.provider == provider })?.enabled != true)
+      }.padding(12)
+    }.frame(width: 380)
   }
 }
 
@@ -351,7 +418,7 @@ struct SettingsView: View {
                   store.editService(service.provider) { $0.sourcePath = "" }
                 }
               }
-              Text(store.tooltip(service.provider)).font(.caption).textSelection(.enabled)
+              Text(store.detailsText(service.provider)).font(.caption).textSelection(.enabled)
               Divider()
             }
           }

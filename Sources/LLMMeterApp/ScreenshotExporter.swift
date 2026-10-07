@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 enum ScreenshotExporter {
-  static func export(to output: URL, dark: Bool = false) throws {
+  static func export(to output: URL, dark: Bool = false, details: Bool = false) throws {
     // Render the actual native view with fictional data and isolated storage.
     // Do not start scheduling, query providers, or read the user's settings.
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -75,8 +75,15 @@ enum ScreenshotExporter {
           Text(store.menuBarValue).font(.system(size: 12)).monospacedDigit()
         }.padding(.horizontal, 12).padding(.vertical, 6)
           .background(Color(nsColor: .windowBackgroundColor), in: Capsule())
-        UsagePanel(store: store, maximumContentHeight: { 700 }, openSettings: {})
-          .background(Color(nsColor: .windowBackgroundColor))
+        Group {
+          if details {
+            UsageDetailsView(
+              store: store, provider: .antigravity,
+              maximumContentHeight: { 520 }, back: {})
+          } else {
+            UsagePanel(store: store, maximumContentHeight: { 700 }, openSettings: {})
+          }
+        }.background(Color(nsColor: .windowBackgroundColor))
           .clipShape(RoundedRectangle(cornerRadius: 12))
       }.padding(20).background(Color(nsColor: .underPageBackgroundColor))
         .environment(\.colorScheme, dark ? .dark : .light))
