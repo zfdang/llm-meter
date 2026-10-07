@@ -1,0 +1,40 @@
+name: Package macOS app
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Apple Silicon app
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and package
+        run: ./scripts/build-app.sh
+      - name: Verify architecture and signature
+        run: |
+          test "$(lipo -archs 'build/LLM Meter.app/Contents/MacOS/LLMMeter')" = arm64
+          codesign --verify --strict 'build/LLM Meter.app'
+      - name: Generate checksum
+        working-directory: build
+        run: shasum -a 256 LLM-Meter-arm64.zip > LLM-Meter-arm64.zip.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LLM-Meter-arm64
+          path: |
+            build/LLM-Meter-arm64.zip
+            build/LLM-Meter-arm64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

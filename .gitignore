@@ -31,3 +31,10 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Swift and application build output
+.build/
+.swiftpm/
+build/
+.DS_Store
+*.xcuserstate
