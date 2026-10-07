@@ -14,6 +14,9 @@ public struct CopilotProvider: UsageProvider {
     let candidates = try credentials(configuration.sourcePath)
     var rejected = MeterError.authentication(
       "Copilot rejected the existing sign-in. Sign in through Copilot, then refresh.")
+    // Bound attempts and try another existing token only after an auth rejection.
+    // Rate limits, network failures, and malformed replies stop the refresh rather
+    // than multiplying requests or bypassing a shared account cooldown.
     for before in candidates.prefix(8) {
       do {
         let identity = try await query("/user", token: before.token)
@@ -107,6 +110,8 @@ public struct CopilotProvider: UsageProvider {
   }
 
   private static func githubHost(_ host: String) -> Bool {
+    // This gates supported account types; it never chooses a request destination.
+    // query() always sends tokens to the fixed api.github.com origin.
     ["github.com", "https://github.com", "https://github.com/"].contains(host.lowercased())
   }
   private static func keychain(_ account: String) -> String? {

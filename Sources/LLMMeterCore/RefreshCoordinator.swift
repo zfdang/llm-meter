@@ -66,8 +66,12 @@ public actor RefreshCoordinator {
     let now = clock()
     for configuration in settings.services {
       let id = configuration.provider
-      guard only == nil || only == id, configuration.enabled,
-        settings.active(configuration) || (manual && only == id), tasks[id] == nil
+      // Explicit per-service validation may read a hidden source. General refresh
+      // uses only active sources; disabled monitoring never gets bypassed.
+      let matchesSelection = only == nil || only == id
+      let explicitlyRequested = manual && only == id
+      let shouldRead = settings.active(configuration) || explicitlyRequested
+      guard matchesSelection, configuration.enabled, shouldRead, tasks[id] == nil
       else { continue }
       guard now >= (cooldowns[id] ?? .distantPast),
         now.timeIntervalSince(attempts[id] ?? .distantPast) >= id.manualInterval

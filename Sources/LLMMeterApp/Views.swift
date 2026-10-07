@@ -373,7 +373,15 @@ struct SettingsView: View {
     -> Binding<T>
   {
     Binding(
-      get: { store.settings.services.first { $0.provider == id }![keyPath: key] },
+      get: {
+        guard let service = store.settings.services.first(where: { $0.provider == id }) else {
+          var unavailable = ServiceConfiguration(provider: id)
+          unavailable.enabled = false
+          unavailable.visible = false
+          return unavailable[keyPath: key]
+        }
+        return service[keyPath: key]
+      },
       set: { value in store.editService(id) { $0[keyPath: key] = value } })
   }
   private func sourcePlaceholder(_ id: ProviderID) -> String {

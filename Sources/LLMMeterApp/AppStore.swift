@@ -14,6 +14,7 @@ final class AppStore: ObservableObject {
   private var timer: Timer?
   private var settingsWritable = true
   private var cacheWritable = true
+  private var cacheDirty = false
   private var sleeping = false
   private var observers: [NSObjectProtocol] = []
 
@@ -61,6 +62,7 @@ final class AppStore: ObservableObject {
     eventTask = Task { [weak self] in
       for await event in coordinator.events {
         guard let self, !Task.isCancelled else { break }
+        if self.states[event.provider]?.snapshot != event.state.snapshot { self.cacheDirty = true }
         self.states[event.provider] = event.state
         // Bind the default metric once, after a verified reading, rather than following an account switch.
         if self.settings.showUsage, self.settings.selectedProvider == event.provider,
@@ -77,11 +79,8 @@ final class AppStore: ObservableObject {
             }
           }
         }
-        if !event.state.refreshing && self.cacheWritable {
-          do { try self.storage.saveCache(self.states.values.compactMap(\.snapshot)) } catch {
-            self.message = error.localizedDescription
-          }
-        }
+        // Coalesce a refresh batch into one write; errors without new data need none.
+        if !self.refreshing { self.persistCacheIfNeeded() }
       }
     }
     timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
@@ -112,6 +111,7 @@ final class AppStore: ObservableObject {
     Task { await coordinator.refresh() }
   }
   func stop() {
+    persistCacheIfNeeded()
     timer?.invalidate()
     timer = nil
     eventTask?.cancel()
@@ -119,6 +119,13 @@ final class AppStore: ObservableObject {
     for observer in observers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
     observers.removeAll()
     Task { await coordinator.suspend() }
+  }
+  private func persistCacheIfNeeded() {
+    guard cacheWritable, cacheDirty else { return }
+    do {
+      try storage.saveCache(states.values.compactMap(\.snapshot))
+      cacheDirty = false
+    } catch { message = error.localizedDescription }
   }
   var canEditSettings: Bool { settingsWritable }
   var refreshing: Bool { states.values.contains { $0.refreshing } }

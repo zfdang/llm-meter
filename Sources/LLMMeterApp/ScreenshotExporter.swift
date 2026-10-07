@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 enum ScreenshotExporter {
-  static func export(to output: URL) throws {
+  static func export(to output: URL, dark: Bool = false) throws {
     // Render the actual native view with fictional data and isolated storage.
     // Do not start scheduling, query providers, or read the user's settings.
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -67,7 +67,7 @@ enum ScreenshotExporter {
       storage: LocalStorage(directory: directory), snapshots: snapshots, now: now)
     let app = NSApplication.shared
     app.setActivationPolicy(.accessory)
-    app.appearance = NSAppearance(named: .aqua)
+    app.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
     let view = NSHostingView(
       rootView: VStack(spacing: 14) {
         HStack(spacing: 6) {
@@ -78,8 +78,8 @@ enum ScreenshotExporter {
         UsagePanel(store: store, maximumContentHeight: { 700 }, openSettings: {})
           .background(Color(nsColor: .windowBackgroundColor))
           .clipShape(RoundedRectangle(cornerRadius: 12))
-      }.padding(20).background(Color.white)
-        .environment(\.colorScheme, .light))
+      }.padding(20).background(Color(nsColor: .underPageBackgroundColor))
+        .environment(\.colorScheme, dark ? .dark : .light))
     let size = view.fittingSize
     let window = NSWindow(
       contentRect: NSRect(origin: .zero, size: size), styleMask: .borderless,

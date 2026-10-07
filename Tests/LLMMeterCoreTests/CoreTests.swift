@@ -6,6 +6,7 @@ import Testing
 private let instant = Date(timeIntervalSince1970: 1_790_000_000)
 
 @Test func displayTimesDistinguishUnknownPassedAndUpcomingResets() {
+  #expect(UsageDisplay.resetCountdown(.distantFuture, now: instant) == "Resets in 999d+")
   #expect(UsageDisplay.resetCountdown(nil, now: instant) == "Reset unknown")
   #expect(UsageDisplay.resetCountdown(instant, now: instant) == "Awaiting update")
   #expect(
@@ -223,6 +224,24 @@ private func codexOnly() -> AppSettings {
   try await settle { await source.count == 2 }
   await source.succeed()
   try await settle { (await coordinator.state(for: .codex)).confirmed }
+}
+
+@Test func targetedRefreshCanReadHiddenButNeverDisabledSources() async throws {
+  let source = ControlledProvider()
+  var settings = codexOnly()
+  settings.services[0].visible = false
+  let coordinator = RefreshCoordinator(settings: settings, provider: source)
+  await coordinator.refresh()
+  await coordinator.refresh(manual: true)
+  #expect(await source.count == 0)
+  await coordinator.refresh(manual: true, only: .codex)
+  try await settle { await source.count == 1 }
+  await source.succeed()
+  try await settle { !(await coordinator.state(for: .codex)).refreshing }
+  settings.services[0].enabled = false
+  await coordinator.update(settings)
+  await coordinator.refresh(manual: true, only: .codex)
+  #expect(await source.count == 1)
 }
 
 @Test func lateResponseCannotRestoreChangedSource() async throws {
