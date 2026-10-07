@@ -65,7 +65,7 @@ Keep one menu bar item. Multiple simultaneous services, stacked window labels, a
 
 ### 3.2 Usage Panel
 
-Use a simple menu-style layout: title, usage rows, separators, and actions. Each LLM occupies one row with fixed 5h and Weekly columns. Services with distinct quota groups, such as Antigravity, use a service heading followed by one subrow per source-reported group. Never aggregate independent pools into an account-wide percentage. Avoid expandable cards and permanent progress bars. Use a width of approximately 380 pt to fit reset countdowns, and a content-dependent height with a maximum and scrolling.
+Use a simple menu-style layout: title, usage rows, separators, and actions. Each LLM occupies one row with fixed 5h and Weekly columns. Services with distinct quota groups, such as Antigravity, use a service heading followed by one subrow per source-reported group. Never aggregate independent pools into an account-wide percentage. Avoid expandable cards and permanent progress bars. Use a width of approximately 380 pt to fit reset countdowns. Fit the height to content, allowing up to 700 pt for usage rows while reserving 180 pt of the menu bar screen's available height for controls and margins. Scroll only when content exceeds that limit.
 
 ```text
 ┌────────────────────────────┐

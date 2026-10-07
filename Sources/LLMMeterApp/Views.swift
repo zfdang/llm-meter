@@ -5,6 +5,7 @@ import SwiftUI
 
 struct UsagePanel: View {
   @ObservedObject var store: AppStore
+  var maximumContentHeight: () -> CGFloat
   var openSettings: () -> Void
 
   var body: some View {
@@ -83,7 +84,9 @@ struct UsagePanel: View {
         ? store.antigravityModels.count : store.antigravityPools.count
       return total + (service.provider == .antigravity && count > 0 ? 32 + count * 60 : 64)
     }
-    return CGFloat(min(420, rows + max(0, store.visibleServices.count - 1) * 12 + 8))
+    return min(
+      maximumContentHeight(),
+      CGFloat(rows + max(0, store.visibleServices.count - 1) * 12 + 8))
   }
 
   private func serviceRow(_ id: ProviderID) -> some View {

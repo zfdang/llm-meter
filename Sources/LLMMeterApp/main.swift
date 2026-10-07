@@ -18,7 +18,16 @@ final class MenuBarController: NSObject {
     item.button?.action = #selector(toggle)
     popover.behavior = .transient
     popover.contentViewController = NSHostingController(
-      rootView: UsagePanel(store: store) { [weak self] in self?.showSettings() })
+      rootView: UsagePanel(
+        store: store,
+        maximumContentHeight: { [weak self] in
+          let screenHeight =
+            self?.item.button?.window?.screen?.visibleFrame.height
+            ?? NSScreen.main?.visibleFrame.height ?? 900
+          // Reserve space for the header, footer, and popover margins.
+          return max(160, min(700, screenHeight - 180))
+        }
+      ) { [weak self] in self?.showSettings() })
     store.objectWillChange.sink { [weak self] in
       Task { @MainActor in self?.render() }
     }.store(in: &subscriptions)
