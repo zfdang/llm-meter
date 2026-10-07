@@ -10,9 +10,21 @@ import Testing
     arguments: ["-c", "echo $$; /bin/ps -o pgid= -p $$; pwd; exit 7"], timeout: 5)
   let lines = String(decoding: result.output, as: UTF8.self).split(separator: "\n")
   #expect(result.status == 7)
-  #expect(lines.count == 3)
-  #expect(Int32(lines[0]) == Int32(lines[1].trimmingCharacters(in: .whitespaces)))
-  #expect(URL(fileURLWithPath: String(lines[2])).lastPathComponent.hasPrefix("llm-meter-"))
+  // Guard index access: restricted hosts can block /bin/ps (empty stdout line).
+  guard lines.count >= 2, let shellPID = Int32(lines[0]) else {
+    Issue.record("Unexpected shell output: \(lines)")
+    return
+  }
+  #expect(
+    URL(fileURLWithPath: String(lines.last ?? "")).lastPathComponent.hasPrefix("llm-meter-"))
+  guard let pgid = Int32(lines[1].trimmingCharacters(in: .whitespaces)) else {
+    // A restricted host can block /bin/ps, which leaves this line empty; the
+    // process-group assertion cannot run there and fails loudly instead of
+    // crashing on index access.
+    Issue.record("/bin/ps did not report a process group; output: \(lines)")
+    return
+  }
+  #expect(shellPID == pgid)
 }
 
 @Test(arguments: [false, true])
@@ -49,6 +61,7 @@ func runnerKillsGrandchildWhenLeaderExitsOnTerm(cancel: Bool) async throws {
   } catch {
     if !cancel { #expect(error as? MeterError == .timeout) }
   }
+  await ProcessRunner.finishTerminationSignals()
   let result = try await runner.run(
     executable: "/bin/ps", arguments: ["-o", "stat=,command=", "-p", String(pid)], timeout: 5)
   let state = String(decoding: result.output, as: UTF8.self).trimmingCharacters(
@@ -68,4 +81,44 @@ func runnerKillsGrandchildWhenLeaderExitsOnTerm(cancel: Bool) async throws {
   let result = try await runner.run(executable: "/usr/bin/printf", arguments: ["ready"], timeout: 5)
   #expect(result.status == 0)
   #expect(String(decoding: result.output, as: UTF8.self) == "ready")
+}
+
+@Test func cancellingSeveralProcessesDoesNotWaitForEachGracePeriod() async throws {
+  let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+  try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: directory) }
+  let files = (0..<4).map { directory.appendingPathComponent("ready-\($0)") }
+  let runner = ProcessRunner()
+  let tasks = files.map { file in
+    Task {
+      try await runner.run(
+        executable: "/bin/sh",
+        arguments: [
+          "-c", "trap '' TERM; echo $$ > \"$1\"; exec /bin/sleep 20", "child", file.path,
+        ],
+        timeout: 30)
+    }
+  }
+  defer { for task in tasks { task.cancel() } }
+  let deadline = Date().addingTimeInterval(5)
+  var ready = false
+  while !ready, Date() < deadline {
+    ready = files.allSatisfy { file in
+      guard let text = try? String(contentsOf: file, encoding: .utf8) else { return false }
+      return Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)) != nil
+    }
+    if !ready { try await Task.sleep(for: .milliseconds(20)) }
+  }
+  try #require(ready)
+  let start = Date()
+  for task in tasks { task.cancel() }
+  // The old serial cancellation path spent at least 4 × 150 ms here.
+  #expect(Date().timeIntervalSince(start) < 0.3)
+  for task in tasks {
+    do {
+      _ = try await task.value
+      Issue.record("A cancelled subprocess unexpectedly succeeded")
+    } catch {}
+  }
+  await ProcessRunner.finishTerminationSignals()
 }
