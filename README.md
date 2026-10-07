@@ -9,6 +9,8 @@ A native macOS menu bar utility for LLM usage and remaining allowances. Requires
 
 Click the meter icon or usage label to see a compact **5h / Weekly** list. Settings controls which services appear, their order, used versus remaining values, and whether the menu bar shows the default icon or one selected service icon followed by its usage percentage.
 
+Click a service name or usage value to open its full details in a bounded, scrollable panel. Text wraps, can be selected, and updates during refresh. Use **Back** to return to the overview; hover tips contain only a short summary. The footer also explains this shortcut.
+
 Click the small pin beside a provider's name to show that provider in the menu bar immediately. A filled blue pin marks the current selection; an outlined gray pin marks other providers. Switching selects the provider's first available metric; clicking the current provider preserves its selected metric.
 
 Each usage window includes a reset countdown. The footer shows the latest successful update among visible enabled services; hover over it for each service's update age. Hover over a row for exact reset and reading times, masked account details, plan, and errors. Unknown reset times stay unknown; a passed reset shows “Awaiting update” until the source confirms a new allowance. Reset credits are not displayed by the current adapters.
@@ -98,5 +100,12 @@ The default mark uses a full circular gauge with a larger footprint in the same
 18-point slot. Template rendering follows the menu bar's light/dark appearance.
 
 ![Previous and current default icon beside service icons](docs/images/menu-bar-icons.png)
+
+</details>
+
+<details>
+<summary>Scrollable service details</summary>
+
+![Service details with wrapped text and scrolling](docs/images/usage-details.png)
 
 </details>

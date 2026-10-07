@@ -337,7 +337,13 @@ final class AppStore: ObservableObject {
   var menuBarLabel: String {
     settings.showUsage ? "\(settings.selectedProvider.name) \(menuBarValue)" : "LLM Meter"
   }
-  func tooltip(_ id: ProviderID) -> String {
+  func hoverSummary(_ id: ProviderID) -> String {
+    [
+      id.name, serviceStatusLabel(id) ?? updateLabel(id),
+      L10n.text("Click for full details"),
+    ].joined(separator: "\n")
+  }
+  func detailsText(_ id: ProviderID) -> String {
     guard let state = states[id] else { return L10n.text("Not read yet") }
     var lines = [id.name]
     if settings.services.first(where: { $0.provider == id })?.enabled == false {
@@ -352,13 +358,18 @@ final class AppStore: ObservableObject {
       )
       if let plan = snapshot.plan { lines.append(L10n.format("Plan: %@", plan)) }
       for metric in snapshot.metrics {
+        var name = L10n.text(metric.name)
+        if let scope = metric.scope, scope.hasPrefix("pool:") {
+          let group = String(scope.dropFirst(5))
+          if !metric.name.hasPrefix(group) { name = "\(group) · \(name)" }
+        }
         let value =
           metric.percent(remaining: settings.showRemaining).map { String(format: "%.1f%%", $0) }
           ?? L10n.text("Unknown")
         lines.append(
           metric.unlimited
-            ? "\(L10n.text(metric.name)): \(L10n.text("Unlimited"))"
-            : "\(L10n.text(metric.name)): \(value) \(settings.showRemaining ? L10n.text("remaining") : L10n.text("used"))"
+            ? "\(name): \(L10n.text("Unlimited"))"
+            : "\(name): \(value) \(settings.showRemaining ? L10n.text("remaining") : L10n.text("used"))"
         )
         if metric.unit != nil { lines.append(countLabel(metric)) }
         if let reset = metric.resetAt {

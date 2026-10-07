@@ -17,7 +17,7 @@ final class MenuBarController: NSObject {
     item.button?.target = self
     item.button?.action = #selector(toggle)
     popover.behavior = .transient
-    popover.contentViewController = NSHostingController(
+    let hosting = NSHostingController(
       rootView: UsagePanel(
         store: store,
         maximumContentHeight: { [weak self] in
@@ -25,9 +25,11 @@ final class MenuBarController: NSObject {
             self?.item.button?.window?.screen?.visibleFrame.height
             ?? NSScreen.main?.visibleFrame.height ?? 900
           // Reserve space for the header, footer, and popover margins.
-          return max(160, min(700, screenHeight - 180))
+          return max(160, min(700, screenHeight - 200))
         }
       ) { [weak self] in self?.showSettings() })
+    hosting.sizingOptions.insert(.preferredContentSize)
+    popover.contentViewController = hosting
     store.objectWillChange.sink { [weak self] in
       Task { @MainActor in self?.render() }
     }.store(in: &subscriptions)
@@ -41,7 +43,7 @@ final class MenuBarController: NSObject {
     item.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
     item.button?.toolTip =
       store.settings.showUsage
-      ? store.tooltip(store.settings.selectedProvider)
+      ? store.menuBarLabel + "\n" + L10n.text("Click to view usage")
       : L10n.text("LLM Meter · Click to view usage")
     item.button?.setAccessibilityLabel(store.settings.showUsage ? store.menuBarLabel : "LLM Meter")
   }
@@ -184,7 +186,8 @@ if let index = arguments.firstIndex(of: "--export-screenshot"),
   arguments.indices.contains(index + 1)
 {
   try ScreenshotExporter.export(
-    to: URL(fileURLWithPath: arguments[index + 1]), dark: arguments.contains("--dark"))
+    to: URL(fileURLWithPath: arguments[index + 1]), dark: arguments.contains("--dark"),
+    details: arguments.contains("--details"))
 } else if arguments.contains("--diagnose") {
   Task {
     let provider = ProviderRegistry()
