@@ -96,24 +96,21 @@ struct UsagePanel: View {
   private func serviceRow(_ id: ProviderID) -> some View {
     HStack(spacing: 0) {
       VStack(alignment: .leading, spacing: 5) {
-        Text(id.name).font(.system(size: 13, weight: .medium))
+        providerHeading(id)
         if let status = store.serviceStatusLabel(id) {
           Text(status).font(.system(size: 10)).foregroundStyle(.secondary)
         }
       }.frame(maxWidth: .infinity, alignment: .leading)
       window(id, period: .fiveHours)
       window(id, period: .weekly)
-    }.padding(.vertical, 10).contentShape(Rectangle()).help(store.tooltip(id))
-      .accessibilityElement(children: .ignore)
-      .accessibilityLabel(
-        "\(id.name), 5 hours \(store.label(id, period: .fiveHours)), weekly \(store.label(id, period: .weekly)). \(store.tooltip(id))"
-      )
+    }.padding(.vertical, 10).contentShape(Rectangle())
+      .accessibilityElement(children: .contain)
   }
 
   private var antigravityRows: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack {
-        Text("Antigravity").font(.system(size: 13, weight: .medium))
+        providerHeading(.antigravity)
         Spacer()
         if let status = store.serviceStatusLabel(.antigravity) {
           Text(status).font(.system(size: 10)).foregroundStyle(.secondary)
@@ -127,7 +124,7 @@ struct UsagePanel: View {
               .frame(maxWidth: .infinity, alignment: .leading)
             window(.antigravity, period: .fiveHours, scope: scope)
             window(.antigravity, period: .weekly, scope: scope)
-          }.padding(.vertical, 10)
+          }.padding(.vertical, 10).help(store.tooltip(.antigravity))
         }
       } else {
         ForEach(store.antigravityModels) { metric in
@@ -145,16 +142,16 @@ struct UsagePanel: View {
               )
               .foregroundStyle(.secondary)
             }
-          }.padding(.vertical, 10)
+          }.padding(.vertical, 10).help(store.tooltip(.antigravity))
         }
       }
-    }.help(store.tooltip(.antigravity))
+    }
   }
 
   private var copilotRows: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack {
-        Text("GitHub Copilot").font(.system(size: 13, weight: .medium))
+        providerHeading(.copilot)
         Spacer()
         Text("Monthly").font(.system(size: 10)).foregroundStyle(.secondary)
       }.padding(.top, 10).padding(.bottom, 6)
@@ -176,9 +173,31 @@ struct UsagePanel: View {
               .foregroundStyle(.secondary)
             }
           }
-        }.padding(.vertical, 10)
+        }.padding(.vertical, 10).help(store.tooltip(.copilot))
       }
-    }.help(store.tooltip(.copilot))
+    }
+  }
+
+  private func providerHeading(_ id: ProviderID) -> some View {
+    let selected = store.settings.showUsage && store.settings.selectedProvider == id
+    return HStack(spacing: 5) {
+      Text(id.name).font(.system(size: 13, weight: .medium)).fixedSize()
+        .help(store.tooltip(id))
+      Button {
+        store.showProviderInMenuBar(id)
+      } label: {
+        Image(systemName: selected ? "pin.fill" : "pin")
+          .font(.system(size: 10, weight: .semibold))
+          .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+          .frame(width: 22, height: 22)
+          .background(
+            selected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04),
+            in: RoundedRectangle(cornerRadius: 5))
+      }.buttonStyle(.plain).disabled(!store.canEditSettings)
+        .help(selected ? "Shown in the menu bar" : "Show \(id.name) in the menu bar")
+        .accessibilityLabel("Show \(id.name) in the menu bar")
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+    }
   }
 
   private func value(_ label: String, used: Double?) -> some View {
@@ -203,6 +222,11 @@ struct UsagePanel: View {
       Text(store.resetLabel(id, period: period, scope: scope)).font(.system(size: 10))
         .monospacedDigit().foregroundStyle(.secondary)
     }.frame(width: 105, alignment: .trailing)
+      .help(store.tooltip(id))
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(
+        "\(id.name), \(period == .fiveHours ? "5 hours" : "Weekly"), \(store.label(id, period: period, scope: scope)), \(store.resetLabel(id, period: period, scope: scope))"
+      )
   }
 
   private func action(_ text: String, symbol: String, action: @escaping () -> Void) -> some View {

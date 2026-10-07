@@ -52,7 +52,6 @@ final class AppStore: ObservableObject {
     store.settings.showUsage = true
     store.settings.selectedMetricID = "fiveHours"
     store.settings.selectedAccountID = snapshots.first { $0.provider == .codex }?.accountID
-    store.settingsWritable = false
     store.cacheWritable = false
     return store
   }
@@ -173,6 +172,21 @@ final class AppStore: ObservableObject {
       let snapshot = state?.confirmed == true ? state?.snapshot : nil
       settings.selectedAccountID = snapshot?.accountID
       settings.selectedMetricID = snapshot?.metrics.first?.id ?? "primary"
+    }
+  }
+  func showProviderInMenuBar(_ id: ProviderID) {
+    if settings.selectedProvider == id {
+      // Preserve the selected metric when enabling usage mode for the same service.
+      change { $0.showUsage = true }
+    } else {
+      change { settings in
+        settings.showUsage = true
+        settings.selectedProvider = id
+        let state = states[id]
+        let snapshot = state?.confirmed == true ? state?.snapshot : nil
+        settings.selectedAccountID = snapshot?.accountID
+        settings.selectedMetricID = snapshot?.metrics.first?.id ?? "primary"
+      }
     }
   }
   func selectMetric(_ id: String) {
