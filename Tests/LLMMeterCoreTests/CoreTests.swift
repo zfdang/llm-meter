@@ -272,6 +272,7 @@ private actor FixtureTransport: HTTPTransport {
   init(_ responses: [String]) { self.responses = responses.map { Data($0.utf8) } }
   func data(for request: URLRequest) async throws -> Data {
     requests.append(request)
+    guard !responses.isEmpty else { throw MeterError.unsupported("Fixture endpoint unavailable") }
     return responses.removeFirst()
   }
 }
@@ -305,13 +306,16 @@ private actor FixtureTransport: HTTPTransport {
   let network = FixtureTransport([
     #"{"id":"google-account","email":"a@example.com"}"#,
     #"{"models":{"gemini":{"quotaInfo":{"remainingFraction":0.25}}}}"#,
+    #"{"groups":[{"displayName":"Gemini","buckets":[{"window":"5h","remainingFraction":0.5},{"window":"weekly","remainingFraction":0.8}]}]}"#,
   ])
   let snapshot = try await AntigravityProvider(network: network).fetch(
     configuration: .init(provider: .antigravity, sourcePath: path.path))
   #expect(snapshot.metrics[0].usedPercent == 75)
   #expect(snapshot.accountLabel == "a•••@example.com")
   #expect(try Data(contentsOf: path) == data)
-  #expect(await network.requests.count == 2)
+  #expect(await network.requests.count == 3)
+  #expect(snapshot.metrics.count == 3)
+  #expect(snapshot.metrics[2].period == .weekly)
 }
 
 @Test func claudeVersionGatePreventsUnsupportedPrintCommands() {

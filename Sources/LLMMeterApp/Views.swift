@@ -30,24 +30,30 @@ struct UsagePanel: View {
         ScrollView {
           VStack(spacing: 0) {
             ForEach(store.visibleServices) { service in
-              HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 3) {
-                  Text(service.provider.name)
-                  Text(store.updateLabel(service.provider)).font(.caption2)
-                    .foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, alignment: .leading)
-                window(service.provider, period: .fiveHours)
-                window(service.provider, period: .weekly)
+              if service.provider == .antigravity,
+                !store.antigravityPools.isEmpty || !store.antigravityModels.isEmpty
+              {
+                antigravityRows
+              } else {
+                HStack(spacing: 0) {
+                  VStack(alignment: .leading, spacing: 3) {
+                    Text(service.provider.name)
+                    Text(store.updateLabel(service.provider)).font(.caption2)
+                      .foregroundStyle(.secondary)
+                  }.frame(maxWidth: .infinity, alignment: .leading)
+                  window(service.provider, period: .fiveHours)
+                  window(service.provider, period: .weekly)
+                }
+                .monospacedDigit().padding(.horizontal, 12).padding(.vertical, 8)
+                .contentShape(Rectangle()).help(store.tooltip(service.provider))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                  "\(service.provider.name), 5 hours \(store.label(service.provider, period: .fiveHours)), weekly \(store.label(service.provider, period: .weekly)). \(store.tooltip(service.provider))"
+                )
               }
-              .monospacedDigit().padding(.horizontal, 12).padding(.vertical, 8)
-              .contentShape(Rectangle()).help(store.tooltip(service.provider))
-              .accessibilityElement(children: .ignore)
-              .accessibilityLabel(
-                "\(service.provider.name), 5 hours \(store.label(service.provider, period: .fiveHours)), weekly \(store.label(service.provider, period: .weekly)). \(store.tooltip(service.provider))"
-              )
             }
           }
-        }.frame(height: CGFloat(min(store.visibleServices.count, 8) * 52))
+        }.frame(height: CGFloat(min(store.panelRows, 8) * 52))
       }
       Divider().padding(.top, 6)
       VStack(spacing: 0) {
@@ -60,10 +66,45 @@ struct UsagePanel: View {
       }.padding(.vertical, 4)
     }.frame(width: 380)
   }
-  private func window(_ id: ProviderID, period: MetricPeriod) -> some View {
+  private var antigravityRows: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack {
+        Text("Antigravity").fontWeight(.medium)
+        Spacer()
+        Text(store.updateLabel(.antigravity)).font(.caption2).foregroundStyle(.secondary)
+      }.padding(.vertical, 8)
+      if !store.antigravityPools.isEmpty {
+        ForEach(store.antigravityPools, id: \.self) { scope in
+          HStack(spacing: 0) {
+            Text(String(scope.dropFirst(5))).font(.caption)
+              .frame(maxWidth: .infinity, alignment: .leading)
+            window(.antigravity, period: .fiveHours, scope: scope)
+            window(.antigravity, period: .weekly, scope: scope)
+          }.padding(.vertical, 8)
+        }
+      } else {
+        ForEach(store.antigravityModels) { metric in
+          HStack {
+            VStack(alignment: .leading, spacing: 3) {
+              Text(metric.name).font(.caption)
+              Text("Model quota · window unknown").font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 3) {
+              Text(store.modelLabel(metric))
+              Text(UsageDisplay.resetCountdown(metric.resetAt, now: store.now)).font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+          }.padding(.vertical, 8)
+        }
+      }
+    }.monospacedDigit().padding(.horizontal, 12).help(store.tooltip(.antigravity))
+  }
+  private func window(_ id: ProviderID, period: MetricPeriod, scope: String? = nil) -> some View {
     VStack(alignment: .trailing, spacing: 3) {
-      Text(store.label(id, period: period))
-      Text(store.resetLabel(id, period: period)).font(.caption2).foregroundStyle(.secondary)
+      Text(store.label(id, period: period, scope: scope))
+      Text(store.resetLabel(id, period: period, scope: scope)).font(.caption2).foregroundStyle(
+        .secondary)
     }.frame(width: 105, alignment: .trailing)
   }
   private func action(_ text: String, symbol: String, action: @escaping () -> Void) -> some View {
@@ -155,7 +196,7 @@ struct SettingsView: View {
               HStack {
                 Button("Validate / Refresh") { store.refresh(service.provider) }.disabled(
                   !service.enabled)
-                Button(service.provider == .antigravity ? "Clear source" : "Use default source") {
+                Button("Use default source") {
                   store.editService(service.provider) { $0.sourcePath = "" }
                 }
               }
@@ -209,7 +250,7 @@ struct SettingsView: View {
     switch id {
     case .codex: "Default: ~/.codex/auth.json"
     case .claude: "Auto-detect claude executable"
-    case .antigravity: "Path to Antigravity OAuth JSON"
+    case .antigravity: "Auto-detect running Antigravity (optional OAuth JSON)"
     }
   }
   private func sourceDescription(_ id: ProviderID) -> String {
@@ -219,7 +260,7 @@ struct SettingsView: View {
     case .claude:
       "Requires Claude Code 2.1.285+. Runs its read-only /usage command; no model requests or tools."
     case .antigravity:
-      "Requires a current access_token in an existing OAuth JSON file. Optional project_id; refresh-token-only exports are unsupported. Model quotas appear below and can be selected in Menu Bar."
+      "Leave blank to read the running Antigravity app's local quota status. Keep it open and signed in. Optional fallback: an OAuth JSON with a current access_token. Quota groups and model metrics can be selected in Menu Bar."
     }
   }
   private func choose(_ id: ProviderID) {

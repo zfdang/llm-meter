@@ -27,11 +27,11 @@ open "build/LLM Meter.app"
 | --- | --- | --- |
 | Codex | Existing subscription `auth.json`, using `CODEX_HOME` or `~/.codex` by default | Account-level quota windows; live read verified during development |
 | Claude Code | Installed `claude` executable, version 2.1.285 or newer | Read-only `/usage` parsing and account checks; subscription sign-in required |
-| Antigravity | Existing single-account OAuth JSON with a current `access_token` | Model-scoped quotas; choose a file in Settings, then select a model metric for the menu bar |
+| Antigravity | Running desktop client's local status interface; optional current-token OAuth JSON fallback | Separate quota-group 5h/Weekly rows, model quota fallback, and a selected metric in the menu bar; live local read verified |
 
-Choose a custom Codex auth file or Claude executable in Settings if automatic discovery does not locate your source. Antigravity's current integration requires an OAuth JSON source; automatic discovery of the desktop client's private sign-in storage is not implemented. No integration copies or rotates refresh tokens. Open the original tool to renew expired credentials.
+Choose a custom Codex auth file or Claude executable in Settings if automatic discovery does not locate your source. For Antigravity, leave the source path blank (or click **Use default source**), keep the Antigravity app open and signed in, and refresh. The monitor discovers the client's loopback language server and reads status without browser cookies, credential exports, or its own login flow. A custom OAuth JSON remains an optional fallback. No integration copies or rotates refresh tokens. Open the original tool to renew expired credentials.
 
-Unknown or unsupported periods display `—`. Antigravity model quotas are available in row tooltips and Settings; they are not relabeled as 5h or Weekly without source evidence. Claude Code and Antigravity have fixture coverage; their live subscription reads still require suitable local login sources.
+Unknown or unsupported periods display `—`. Antigravity's quota groups keep separate 5h/Weekly values; when the client supplies only model quotas, the panel shows each model with an unknown window duration. All metrics are available in tooltips, Settings, and the menu bar metric picker. Claude Code has fixture coverage; its live subscription read still requires a suitable local login source.
 
 ## Diagnostics
 

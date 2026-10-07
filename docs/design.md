@@ -25,7 +25,7 @@ An “LLM” in the interface represents a service or subscription account, such
 | Menu bar presence | One menu bar item; no Dock icon (`LSUIElement`) or main window on launch by default |
 | Default icon | A monochrome open-arc meter icon, suitable for light and dark appearances |
 | Selected service usage | Select a service, account, and quota window; show a short service label and percentage without an icon |
-| Usage panel | A compact list with one row per LLM and simultaneous 5h and Weekly columns |
+| Usage panel | A compact list with simultaneous 5h and Weekly columns; services with separate quota groups show one subrow per group |
 | Display selection | Select which LLMs appear in the list and configure their order |
 | Multiple quota windows | Keep short-term, weekly, and model-pool allowances separate |
 | Reset times | Show source-reported reset times and countdowns |
@@ -65,7 +65,7 @@ Keep one menu bar item. Multiple simultaneous services, stacked window labels, a
 
 ### 3.2 Usage Panel
 
-Use a simple menu-style layout: title, usage rows, separators, and actions. Each LLM occupies one row with fixed 5h and Weekly columns. Avoid expandable cards, permanent progress bars, and multiline details. Start with a width of approximately 280–320 pt and a content-dependent height with a maximum and scrolling; validate dimensions during native UI implementation.
+Use a simple menu-style layout: title, usage rows, separators, and actions. Each LLM occupies one row with fixed 5h and Weekly columns. Services with distinct quota groups, such as Antigravity, use a service heading followed by one subrow per source-reported group. Never aggregate independent pools into an account-wide percentage. Avoid expandable cards and permanent progress bars. Use a width of approximately 380 pt to fit reset countdowns, and a content-dependent height with a maximum and scrolling.
 
 ```text
 ┌────────────────────────────┐
@@ -218,7 +218,7 @@ Initial support targets are **Codex, Claude Code, and Antigravity**. All three a
 | --- | --- | --- |
 | Codex | Read an authorized local sign-in source and query its quota source | File/Keychain differences, account identity, quota windows, token expiration, and endpoint availability |
 | Claude Code | Use the local tool's usage command; candidate: `claude -p /usage` | Installed version support, quota-only behavior, exit codes, output format, language, dates, and time zones |
-| Antigravity | First validate locally accessible client usage sources, then select an adapter access method | Account identity, access permissions, model/shared-pool scope, reset periods, weekly availability, and refresh limits |
+| Antigravity | Read the running client's local status and quota summary RPCs; optional existing OAuth JSON fallback | Account identity, current-user process and loopback listener discovery, model/shared-pool scope, reset periods, weekly availability, and refresh limits |
 | Future providers | Prefer explicit usage/balance APIs or the tool's own query interface | Authentication, accounting scope, rate limits, and minimum permissions; an inference API key does not imply subscription quota access |
 
 The candidate Codex path `/wham/usage` is an internal client endpoint, not a stable public API contract. Validate Claude's behavior against the installed official tool. In particular, confirm that `claude -p /usage` is handled locally as a slash command: if a CLI version does not recognize it in print mode, the text may be sent to the model as a prompt and consume the very quota being measured. The adapter must check the CLI version against a validated range and must never fall back to an inference request. Record source versions and redacted response fixtures. If validation fails, show “Unsupported source” rather than guessing how to parse it.

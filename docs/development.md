@@ -57,7 +57,11 @@ Model-scoped weekly lines remain separate from the account-wide weekly value. A 
 
 ### Antigravity
 
-Choose an existing single-account OAuth JSON file in Settings. Accepted access-token shapes include:
+The default source is the running Antigravity desktop client's local language server. Leave the source path blank or select **Use default source**, keep the client open and signed in, then refresh. Discover processes owned by the current user whose executable is inside `Antigravity.app/Contents`; prefer the standalone desktop client, then a stable PID order. Read the process's CSRF flag in memory and discover its numeric loopback-only listening ports with `lsof`. Query only `GetUserStatus` and `RetrieveUserQuotaSummary` over loopback HTTP, with redirects disabled. No TLS verification exception, browser cookies, OAuth login, refresh-token access, generation request, or client-storage modification is involved.
+
+Verify the process/CSRF identity and signed-in account again after the read; discard restarted-client or switched-account responses. Missing quota summaries fall back to model quotas and mark the snapshot partial, preserving earlier group readings as unconfirmed. Raw status responses and CSRF values are not retained in the usage cache. Discovery commands use the bounded, cancellable subprocess runner and its private, automatically removed temporary output files.
+
+Alternatively, choose an existing single-account OAuth JSON file in Settings. Accepted access-token shapes include:
 
 ```json
 {
@@ -80,11 +84,11 @@ or:
 
 These are schema examples, not credentials to commit. The application stores only the source path, never the file contents. A refresh-token-only export is insufficient; no OAuth refresh request is made. The file's owner must keep its access token current.
 
-The adapter verifies account identity with Google's userinfo endpoint. When project_id is absent, it queries loadCodeAssist without onboarding or modifying the account. It then queries fetchAvailableModels and normalizes model quota fractions. These are internal client APIs and can change. Source changes during a refresh invalidate its result.
+The OAuth fallback verifies account identity with Google's userinfo endpoint. When project_id is absent, it queries loadCodeAssist with Antigravity metadata, without onboarding or modifying the account. It then queries fetchAvailableModels and retrieveUserQuotaSummary. These are internal client APIs and can change. Source changes during a refresh invalidate its result.
 
-A reset timestamp does not establish a window duration. Model metrics retain their scope and appear in tooltips, the Services tab, and the menu bar metric picker. The compact account-level 5h/Weekly columns remain `—` when the response supplies only model quotas. A missing remainingFraction stays unknown.
+A reset timestamp does not establish a window duration. Quota summary buckets explicitly named 5h or weekly appear in separate rows for each reported group, such as Gemini Models and Claude/GPT. Model metrics retain their scope and appear in tooltips, the Services tab, and the menu bar metric picker; when no groups are available, the panel displays model quotas with unknown window duration. A missing remainingFraction stays unknown.
 
-Current limitation: automatic Antigravity desktop sign-in discovery and native CLI integration are not implemented. A configured current-token JSON source is required for a live read.
+The local path was verified against the installed running client during development. The client must remain open; changes to its private RPC schema or process layout can require adapter updates. Automatic monitoring supports executable paths without whitespace and numeric loopback listeners; custom OAuth JSON is the fallback for unsupported client layouts.
 
 ## Persistence and Refresh
 

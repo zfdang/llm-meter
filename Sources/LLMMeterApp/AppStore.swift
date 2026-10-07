@@ -171,20 +171,47 @@ final class AppStore: ObservableObject {
       settings.services.swapAt(index, index + offset)
     }
   }
-  func metric(_ id: ProviderID, period: MetricPeriod) -> UsageMetric? {
-    states[id]?.snapshot?.metrics.first { $0.period == period && $0.scope == nil }
+  func metric(_ id: ProviderID, period: MetricPeriod, scope: String? = nil) -> UsageMetric? {
+    states[id]?.snapshot?.metrics.first { $0.period == period && $0.scope == scope }
   }
-  func label(_ id: ProviderID, period: MetricPeriod) -> String {
+  func label(_ id: ProviderID, period: MetricPeriod, scope: String? = nil) -> String {
     guard settings.services.first(where: { $0.provider == id })?.enabled == true else { return "—" }
     return states[id]?.label(
-      metric(id, period: period), now: now, interval: interval(id),
+      metric(id, period: period, scope: scope), now: now, interval: interval(id),
       remaining: settings.showRemaining) ?? "—"
   }
-  func resetLabel(_ id: ProviderID, period: MetricPeriod) -> String {
+  func resetLabel(_ id: ProviderID, period: MetricPeriod, scope: String? = nil) -> String {
     guard settings.services.first(where: { $0.provider == id })?.enabled == true,
-      let metric = metric(id, period: period)
+      let metric = metric(id, period: period, scope: scope)
     else { return "—" }
     return UsageDisplay.resetCountdown(metric.resetAt, now: now)
+  }
+  var antigravityPools: [String] {
+    Set(
+      states[.antigravity]?.snapshot?.metrics.compactMap { metric in
+        metric.scope.flatMap { $0.hasPrefix("pool:") ? $0 : nil }
+      } ?? []
+    ).sorted()
+  }
+  var antigravityModels: [UsageMetric] {
+    states[.antigravity]?.snapshot?.metrics.filter { $0.scope?.hasPrefix("pool:") != true } ?? []
+  }
+  func modelLabel(_ metric: UsageMetric) -> String {
+    guard settings.services.first(where: { $0.provider == .antigravity })?.enabled == true else {
+      return "—"
+    }
+    return states[.antigravity]?.label(
+      metric, now: now, interval: interval(.antigravity), remaining: settings.showRemaining) ?? "—"
+  }
+  var panelRows: Int {
+    visibleServices.reduce(0) { count, service in
+      if service.provider == .antigravity {
+        return count
+          + max(
+            1, (antigravityPools.isEmpty ? antigravityModels.count : antigravityPools.count) + 1)
+      }
+      return count + 1
+    }
   }
   func updateLabel(_ id: ProviderID) -> String {
     guard settings.services.first(where: { $0.provider == id })?.enabled == true else {
@@ -248,7 +275,7 @@ final class AppStore: ObservableObject {
     }
     if id == .antigravity {
       lines.append(
-        "Model quotas are available in Settings. 5h/Weekly are unknown unless explicitly reported.")
+        "Quota groups are shown separately. Model quotas have no assumed window duration.")
     }
     return lines.joined(separator: "\n")
   }

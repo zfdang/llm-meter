@@ -19,7 +19,8 @@ public struct ProviderRegistry: UsageProvider {
     case .codex: try await CodexProvider(network: network).fetch(configuration: configuration)
     case .claude: try await ClaudeProvider(commands: commands).fetch(configuration: configuration)
     case .antigravity:
-      try await AntigravityProvider(network: network).fetch(configuration: configuration)
+      try await AntigravityProvider(network: network, commands: commands).fetch(
+        configuration: configuration)
     }
   }
 }
@@ -187,7 +188,13 @@ public struct ClaudeProvider: UsageProvider {
 
 public struct AntigravityProvider: UsageProvider {
   public let network: any HTTPTransport
-  public init(network: any HTTPTransport = NetworkTransport()) { self.network = network }
+  public let commands: any CommandRunning
+  public init(
+    network: any HTTPTransport = NetworkTransport(), commands: any CommandRunning = ProcessRunner()
+  ) {
+    self.network = network
+    self.commands = commands
+  }
   private struct Credential: Decodable {
     struct Token: Decodable {
       let accessToken: String?
@@ -219,10 +226,9 @@ public struct AntigravityProvider: UsageProvider {
     return auth
   }
   public func fetch(configuration: ServiceConfiguration) async throws -> UsageSnapshot {
-    guard !configuration.sourcePath.isEmpty else {
-      throw MeterError.connection(
-        "Choose an Antigravity OAuth JSON source in Settings. It must contain a current access_token; no tokens are copied or renewed."
-      )
+    if configuration.sourcePath.isEmpty {
+      return try await LocalAntigravityProvider(network: network, commands: commands).fetch(
+        configuration: configuration)
     }
     let auth = try credentials(configuration.sourcePath)
     struct User: Decodable {
@@ -240,8 +246,7 @@ public struct AntigravityProvider: UsageProvider {
         "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", access: auth.access,
         body: [
           "metadata": [
-            "ideType": "IDE_UNSPECIFIED", "platform": "PLATFORM_UNSPECIFIED",
-            "pluginType": "GEMINI",
+            "ideType": "ANTIGRAVITY"
           ]
         ])
       if let reply = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -257,13 +262,31 @@ public struct AntigravityProvider: UsageProvider {
     let data = try await query(
       "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels",
       access: auth.access, body: ["project": project])
+    var summary: Data?
+    do {
+      summary = try await query(
+        "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
+        access: auth.access, body: ["project": project])
+    } catch MeterError.cancelled { throw MeterError.cancelled } catch MeterError.rateLimited(
+      let delay)
+    { throw MeterError.rateLimited(delay) } catch {
+      // Model quotas remain available when the optional summary is unsupported.
+    }
     let current = try credentials(configuration.sourcePath)
     guard current.access == auth.access, current.projectID == auth.projectID else {
       throw MeterError.connection("Antigravity source changed during refresh. Refresh again.")
     }
-    return try UsageParsers.antigravity(
+    var snapshot = try UsageParsers.antigravity(
       data, accountID: SourceFiles.identifier(user.id),
       accountLabel: SourceFiles.masked(user.email), now: Date())
+    snapshot.complete = false
+    if let summary, let metrics = try? AntigravityParsers.summary(summary, now: snapshot.readAt),
+      !metrics.isEmpty
+    {
+      snapshot.metrics += metrics
+      snapshot.complete = true
+    }
+    return snapshot
   }
   private func query(_ url: String, access: String, body: [String: Any]? = nil) async throws -> Data
   {
