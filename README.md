@@ -90,3 +90,13 @@ as reported by the source. Settings and cached readings are language independent
 ![Simplified Chinese usage panel](docs/images/usage-panel-zh.png)
 
 </details>
+
+<details>
+<summary>Default icon and menu bar size comparison</summary>
+
+The default mark uses a full circular gauge with a larger footprint in the same
+18-point slot. Template rendering follows the menu bar's light/dark appearance.
+
+![Previous and current default icon beside service icons](docs/images/menu-bar-icons.png)
+
+</details>
