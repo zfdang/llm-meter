@@ -226,6 +226,30 @@ final class AppStore: ObservableObject {
     }
     return state.error == nil ? "Not read yet" : "Unable to refresh"
   }
+  var panelUpdateLabel: String {
+    let services = visibleServices.filter(\.enabled)
+    if services.contains(where: { states[$0.provider]?.refreshing == true }) {
+      return "Refreshing…"
+    }
+    guard let latest = services.compactMap({ states[$0.provider]?.snapshot?.readAt }).max() else {
+      return "Not updated yet"
+    }
+    return UsageDisplay.updateAge(latest, now: now)
+  }
+  var panelUpdateDetails: String {
+    "Most recent successful read among visible enabled services.\n"
+      + visibleServices.map { "\($0.provider.name): \(updateLabel($0.provider))" }.joined(
+        separator: "\n")
+  }
+  func serviceStatusLabel(_ id: ProviderID) -> String? {
+    guard settings.services.first(where: { $0.provider == id })?.enabled == true else {
+      return "Monitoring off"
+    }
+    guard let state = states[id] else { return "Not read yet" }
+    if state.refreshing { return "Refreshing…" }
+    if state.error != nil { return "Unable to refresh" }
+    return state.snapshot == nil ? "Not read yet" : nil
+  }
   var selectedMetric: UsageMetric? {
     guard let state = states[settings.selectedProvider], let snapshot = state.snapshot,
       state.confirmed, settings.selectedAccountID == snapshot.accountID

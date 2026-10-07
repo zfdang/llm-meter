@@ -62,6 +62,10 @@ struct UsagePanel: View {
         }.frame(height: contentHeight)
       }
       Divider()
+      Text(store.panelUpdateLabel).font(.system(size: 10)).foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.top, 10)
+        .help(store.panelUpdateDetails)
       HStack(spacing: 8) {
         action(store.refreshing ? "Refreshing…" : "Refresh", symbol: "arrow.clockwise") {
           store.refresh()
@@ -93,7 +97,9 @@ struct UsagePanel: View {
     HStack(spacing: 0) {
       VStack(alignment: .leading, spacing: 5) {
         Text(id.name).font(.system(size: 13, weight: .medium))
-        Text(store.updateLabel(id)).font(.system(size: 10)).foregroundStyle(.secondary)
+        if let status = store.serviceStatusLabel(id) {
+          Text(status).font(.system(size: 10)).foregroundStyle(.secondary)
+        }
       }.frame(maxWidth: .infinity, alignment: .leading)
       window(id, period: .fiveHours)
       window(id, period: .weekly)
@@ -109,7 +115,9 @@ struct UsagePanel: View {
       HStack {
         Text("Antigravity").font(.system(size: 13, weight: .medium))
         Spacer()
-        Text(store.updateLabel(.antigravity)).font(.system(size: 10)).foregroundStyle(.secondary)
+        if let status = store.serviceStatusLabel(.antigravity) {
+          Text(status).font(.system(size: 10)).foregroundStyle(.secondary)
+        }
       }.padding(.top, 10).padding(.bottom, 6)
       if !store.antigravityPools.isEmpty {
         ForEach(store.antigravityPools, id: \.self) { scope in
@@ -148,8 +156,7 @@ struct UsagePanel: View {
       HStack {
         Text("GitHub Copilot").font(.system(size: 13, weight: .medium))
         Spacer()
-        Text("Monthly · \(store.updateLabel(.copilot))").font(.system(size: 10)).foregroundStyle(
-          .secondary)
+        Text("Monthly").font(.system(size: 10)).foregroundStyle(.secondary)
       }.padding(.top, 10).padding(.bottom, 6)
       ForEach(store.copilotMetrics) { metric in
         HStack {
