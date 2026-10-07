@@ -21,6 +21,9 @@ struct UsagePanel: View {
           .font(.system(size: 10, weight: .medium))
           .padding(.horizontal, 8).padding(.vertical, 4)
           .background(Color.primary.opacity(0.06), in: Capsule())
+          .help(
+            "Green: under 50% used. Orange: 50% to below 80% used. Red: 80% or more used. Colors keep the same meaning when displaying remaining allowance. Retained or unknown readings are gray."
+          )
       }.padding(16)
       Divider()
       if let message = store.message {
@@ -120,7 +123,7 @@ struct UsagePanel: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 5) {
-              value(store.modelLabel(metric))
+              value(store.modelLabel(metric), used: metric.usedPercent)
               Text(UsageDisplay.resetCountdown(metric.resetAt, now: store.now)).font(
                 .system(size: 10)
               )
@@ -132,14 +135,25 @@ struct UsagePanel: View {
     }.help(store.tooltip(.antigravity))
   }
 
-  private func value(_ label: String) -> some View {
+  private func value(_ label: String, used: Double?) -> some View {
     Text(label).font(.system(size: 18, weight: .medium, design: .rounded)).monospacedDigit()
-      .foregroundStyle(label == "—" ? Color.secondary : Color.primary)
+      .foregroundStyle(usageColor(label, used: used))
+  }
+
+  private func usageColor(_ label: String, used: Double?) -> Color {
+    guard label != "—", !label.hasSuffix("·"), let used, used.isFinite, used >= 0 else {
+      return .secondary
+    }
+    if used >= 80 { return Color(nsColor: .systemRed) }
+    if used >= 50 { return Color(nsColor: .systemOrange) }
+    return Color(nsColor: .systemGreen)
   }
 
   private func window(_ id: ProviderID, period: MetricPeriod, scope: String? = nil) -> some View {
     VStack(alignment: .trailing, spacing: 5) {
-      value(store.label(id, period: period, scope: scope))
+      value(
+        store.label(id, period: period, scope: scope),
+        used: store.metric(id, period: period, scope: scope)?.usedPercent)
       Text(store.resetLabel(id, period: period, scope: scope)).font(.system(size: 10))
         .monospacedDigit().foregroundStyle(.secondary)
     }.frame(width: 105, alignment: .trailing)

@@ -98,6 +98,8 @@ The menu bar and panel share one snapshot store. The panel places reset countdow
 
 The panel uses an accent-colored meter in its header, a used/remaining badge, rounded monospaced percentages, secondary countdowns, and fine service separators. Antigravity group names sit beneath their service heading. A horizontal footer provides Refresh, Settings, and Quit, with press feedback on the main actions. Native semantic colors adapt to appearance; text and VoiceOver descriptions preserve status meaning without relying on color.
 
+Fresh percentages use green below 50% used, orange from 50% to below 80%, and red at 80% or more. Colors are based on consumed allowance, so the same quota remains red when displayed as a low remaining percentage. Stale, unknown, expired, reset-pending, and disabled readings use secondary gray. The used/remaining badge explains the thresholds in its tooltip.
+
 Automatic intervals respect provider minimums. Manual refresh coalesces in-flight requests and respects manual minimums and rate-limit cooldowns. Transient failures retain successful readings. Stale readings use `·`; hard-expired or reset-pending metrics show `—`. Failed automatic refreshes back off, while a user can retry non-rate-limited failures after the manual minimum.
 
 Sleep cancels in-flight work and suspends scheduling. Wake checks due sources once. Generation checks prevent cancelled or outdated source results from changing the current state. At most three initial providers can fetch concurrently.
