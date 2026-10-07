@@ -7,32 +7,55 @@ public enum L10n {
     guard let first = languages.first else { return false }
     let locale = Locale(identifier: first)
     guard locale.language.languageCode?.identifier == "zh" else { return false }
-    if let script = locale.language.script?.identifier { return script == "Hans" }
+    let components = first.replacingOccurrences(of: "_", with: "-").split(separator: "-")
+    // Locale can infer Hans for bare "zh" on some macOS versions. Inspect an
+    // explicitly supplied script instead, keeping unspecified Chinese in English.
+    if let script = components.dropFirst().first(where: {
+      $0.count == 4 && $0.allSatisfy(\.isLetter)
+    }) {
+      return script.lowercased() == "hans"
+    }
     return ["CN", "SG"].contains(locale.region?.identifier ?? "")
   }
 
-  public static var locale: Locale {
-    Locale(identifier: usesSimplifiedChinese(Locale.preferredLanguages) ? "zh_Hans_CN" : "en_US")
-  }
+  // Changing the system language takes effect on the next launch.
+  private static let simplifiedChinese = usesSimplifiedChinese(Locale.preferredLanguages)
+  public static let locale = Locale(identifier: simplifiedChinese ? "zh_Hans_CN" : "en_US")
 
-  public static func text(_ english: String, languages: [String] = Locale.preferredLanguages)
-    -> String
-  {
-    usesSimplifiedChinese(languages) ? translations[english] ?? english : english
+  public static func text(_ english: String, languages: [String]? = nil) -> String {
+    let chinese = languages.map(usesSimplifiedChinese) ?? simplifiedChinese
+    return chinese ? translations[english] ?? english : english
   }
 
   public static func format(
-    _ english: String, _ arguments: String..., languages: [String] = Locale.preferredLanguages
+    _ english: String, _ arguments: String..., languages: [String]? = nil
   ) -> String {
-    let parts = text(english, languages: languages).components(separatedBy: "%@")
+    render(english, arguments: arguments, languages: languages)
+  }
+
+  static func render(_ english: String, arguments: [String], languages: [String]? = nil) -> String {
+    interpolate(english, translated: text(english, languages: languages), arguments: arguments)
+  }
+
+  static func interpolate(_ english: String, translated: String, arguments: [String]) -> String {
+    let sourceCount = english.components(separatedBy: "%@").count - 1
+    let translatedCount = translated.components(separatedBy: "%@").count - 1
+    // A broken translation must not discard arguments. Fall back to the English
+    // template; preserve extra arguments if a caller passes the wrong count.
+    let template = sourceCount == translatedCount ? translated : english
+    let parts = template.components(separatedBy: "%@")
     var result = parts[0]
     for index in 1..<parts.count {
       result += (index <= arguments.count ? arguments[index - 1] : "%@") + parts[index]
     }
+    if arguments.count > sourceCount {
+      result += " " + arguments.dropFirst(sourceCount).joined(separator: " ")
+    }
     return result
   }
 
-  private static let translations: [String: String] = [
+  // Internal visibility lets catalog tests compare source keys and placeholder counts.
+  static let translations: [String: String] = [
     "Usage overview": "用量概览",
     "Remaining": "剩余",
     "Used": "已用",
@@ -99,14 +122,14 @@ public enum L10n {
     "Unable to refresh": "无法刷新",
     "Not updated yet": "尚未更新",
     "Monitoring disabled": "监测已禁用",
-    "Previous account reading · awaiting confirmation": "上次账号读数 · 等待确认",
+    "Cached account · current sign-in unverified": "缓存账号 · 尚未核实当前登录",
     "Unknown": "未知",
     "Unlimited": "不限量",
     "Monthly allowance": "月度额度",
     "remaining": "剩余",
     "used": "已用",
     "Awaiting update after reset": "重置后等待更新",
-    "Retained reading · awaiting confirmation": "保留的读数 · 等待确认",
+    "Missing from this refresh · using previous reading": "本次未返回该指标 · 显示上次读数",
     "Quota groups are shown separately. Model quotas have no assumed window duration.":
       "额度组分别显示。模型额度不会被假定为特定周期。",
     "Reset unknown": "重置时间未知",
@@ -136,10 +159,12 @@ public enum L10n {
     "%@ minutes": "%@ 分钟",
     "Plan: %@": "套餐：%@",
     "Read %@": "读取时间：%@",
-    "Resets in %@": "%@ 后重置",
+    "Resets in %@": "%@后重置",
     "Updated %@ ago": "%@ 前更新",
     "%@ left": "剩余 %@",
     "Most recent successful read among visible enabled services.": "已启用且可见服务中最近一次成功读取的时间。",
+    "Could not render the screenshot.": "无法渲染截图。",
+    "Could not encode the screenshot.": "无法编码截图。",
     "999d+": "超过 999 天",
     "%@d %@h": "%@ 天 %@ 小时",
     "%@h %@m": "%@ 小时 %@ 分钟",
@@ -148,7 +173,7 @@ public enum L10n {
     "Weekly": "每周",
     "5h": "5 小时",
     "Quota": "额度",
-    "Cached reading · awaiting confirmation": "缓存读数 · 等待确认",
+    "Startup cache · awaiting current reading": "启动缓存 · 尚未读取当前用量",
     "Reading is stale": "读数已陈旧",
     "Copilot rejected the existing sign-in. Sign in through Copilot, then refresh.":
       "Copilot 拒绝了现有登录凭证。请通过 Copilot 登录后刷新。",
@@ -228,4 +253,22 @@ public enum L10n {
     "The configured %@ executable is unavailable.": "配置的 %@ 可执行文件不可用。",
     "%@ was not found. Choose its executable in Settings.": "未找到 %@。请在设置中选择其可执行文件。",
   ]
+}
+
+/// Carries an untranslated literal key and arguments until error presentation.
+/// Deliberately does not support string interpolation: use init(_:_:...) instead.
+public struct ErrorMessage: ExpressibleByStringLiteral, Equatable, Sendable {
+  let key: String
+  let arguments: [String]
+  public init(stringLiteral value: StaticString) {
+    key = String(describing: value)
+    arguments = []
+  }
+  public init(_ key: StaticString, _ arguments: String...) {
+    self.key = String(describing: key)
+    self.arguments = arguments
+  }
+  public func localized(languages: [String]? = nil) -> String {
+    L10n.render(key, arguments: arguments, languages: languages)
+  }
 }

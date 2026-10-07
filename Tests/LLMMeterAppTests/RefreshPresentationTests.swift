@@ -45,7 +45,7 @@ private actor Source: UsageProvider {
   _ = NSApplication.shared
   let host = NSHostingView(
     rootView: UsagePanel(store: store, maximumContentHeight: { 700 }, openSettings: {})
-      .environment(\.colorScheme, .light))
+      .environment(\.colorScheme, .light).accentColor(.blue))
   host.frame = NSRect(x: 0, y: 0, width: 380, height: 470)
   let window = NSWindow(
     contentRect: host.frame, styleMask: [.borderless], backing: .buffered, defer: false)

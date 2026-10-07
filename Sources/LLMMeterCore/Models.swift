@@ -154,18 +154,18 @@ public struct AppSettings: Codable, Equatable, Sendable {
 }
 
 public enum MeterError: Error, LocalizedError, Equatable, Sendable {
-  case connection(String)
-  case authentication(String)
-  case unsupported(String)
-  case malformed(String)
+  case connection(ErrorMessage)
+  case authentication(ErrorMessage)
+  case unsupported(ErrorMessage)
+  case malformed(ErrorMessage)
   case rateLimited(TimeInterval)
   case network, timeout, cancelled
-  case storage(String)
+  case storage(ErrorMessage)
   public var errorDescription: String? {
     switch self {
     case .connection(let text), .authentication(let text), .unsupported(let text),
       .malformed(let text), .storage(let text):
-      L10n.text(text)
+      text.localized()
     case .rateLimited: L10n.text("Rate limited. Waiting before retrying.")
     case .network: L10n.text("Could not reach the usage source.")
     case .timeout: L10n.text("The usage source timed out.")

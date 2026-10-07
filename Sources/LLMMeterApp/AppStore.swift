@@ -304,9 +304,9 @@ final class AppStore: ObservableObject {
     if state.refreshing { return L10n.text("Refreshing…") }
     if state.error != nil { return L10n.text("Unable to refresh") }
     guard let snapshot = state.snapshot else { return L10n.text("Not read yet") }
-    if !state.confirmed { return L10n.text("Cached reading · awaiting confirmation") }
+    if !state.confirmed { return L10n.text("Startup cache · awaiting current reading") }
     if snapshot.metrics.contains(where: { $0.pendingConfirmation }) {
-      return L10n.text("Retained reading · awaiting confirmation")
+      return L10n.text("Missing from this refresh · using previous reading")
     }
     if snapshot.metrics.contains(where: {
       state.freshness($0, now: now, interval: interval(id)) == .stale
@@ -348,7 +348,7 @@ final class AppStore: ObservableObject {
     if let snapshot = state.snapshot {
       lines.append(
         state.confirmed
-          ? snapshot.accountLabel : L10n.text("Previous account reading · awaiting confirmation")
+          ? snapshot.accountLabel : L10n.text("Cached account · current sign-in unverified")
       )
       if let plan = snapshot.plan { lines.append(L10n.format("Plan: %@", plan)) }
       for metric in snapshot.metrics {
@@ -369,7 +369,7 @@ final class AppStore: ObservableObject {
           )
         }
         if metric.pendingConfirmation {
-          lines.append(L10n.text("Retained reading · awaiting confirmation"))
+          lines.append(L10n.text("Missing from this refresh · using previous reading"))
         }
         lines.append(UsageDisplay.updateAge(metric.readAt, now: now))
         lines.append(
