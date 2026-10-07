@@ -1,5 +1,7 @@
 # LLM Meter
 
+**English** | [简体中文](README.zh-CN.md)
+
 A native macOS menu bar utility for LLM usage and remaining allowances. Requires Apple Silicon and macOS 13 or later.
 
 <img src="docs/images/usage-panel.png" alt="LLM Meter's provider icon and usage panel" width="420">
@@ -13,7 +15,7 @@ Click a service name or usage value to open its full details in a bounded, scrol
 
 Click the small pin beside a provider's name to show that provider in the menu bar immediately. A filled blue pin marks the current selection; an outlined gray pin marks other providers. Switching selects the provider's first available metric; clicking the current provider preserves its selected metric.
 
-Each usage window includes a reset countdown. The footer shows the latest successful update among visible enabled services; hover over it for each service's update age. Hover over a row for exact reset and reading times, masked account details, plan, and errors. Unknown reset times stay unknown; a passed reset shows “Awaiting update” until the source confirms a new allowance. Reset credits are not displayed by the current adapters.
+Each usage window includes a reset countdown. The footer shows the latest successful update among visible enabled services; hover over it for each service's update age. Open a service's details for exact reset and reading times, masked account details, plan, and errors. Unknown reset times stay unknown; a passed reset shows “Awaiting update” until the source confirms a new allowance. Reset credits are not displayed by the current adapters.
 
 English is the project's working language for documentation, code comments, and development materials.
 
@@ -59,7 +61,7 @@ Copilot supports github.com accounts. It reads existing editor apps.json/hosts.j
 
 Copilot quota reads depend on GitHub's undocumented `/copilot_internal/user` endpoint. GitHub may change or remove it without notice. If access or parsing fails, the app reports the error and retains the last successful reading with its normal stale/expired indicators; the integration may need an update.
 
-Unknown or unsupported periods display `—`. Antigravity's quota groups keep separate 5h/Weekly values; when the client supplies only model quotas, the panel shows each model with an unknown window duration. All metrics are available in tooltips, Settings, and the menu bar metric picker. Claude Code has fixture coverage; its live subscription read still requires a suitable local login source.
+Unknown or unsupported periods display `—`. Antigravity's quota groups keep separate 5h/Weekly values; when the client supplies only model quotas, the panel shows each model with an unknown window duration. All metrics are available in the details panel, Settings, and the menu bar metric picker. Claude Code has fixture coverage; its live subscription read still requires a suitable local login source.
 
 ## Diagnostics
 
