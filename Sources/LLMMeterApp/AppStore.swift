@@ -203,16 +203,6 @@ final class AppStore: ObservableObject {
     return states[.antigravity]?.label(
       metric, now: now, interval: interval(.antigravity), remaining: settings.showRemaining) ?? "—"
   }
-  var panelRows: Int {
-    visibleServices.reduce(0) { count, service in
-      if service.provider == .antigravity {
-        return count
-          + max(
-            1, (antigravityPools.isEmpty ? antigravityModels.count : antigravityPools.count) + 1)
-      }
-      return count + 1
-    }
-  }
   func updateLabel(_ id: ProviderID) -> String {
     guard settings.services.first(where: { $0.provider == id })?.enabled == true else {
       return "Monitoring off"

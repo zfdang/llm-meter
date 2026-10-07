@@ -6,112 +6,158 @@ import SwiftUI
 struct UsagePanel: View {
   @ObservedObject var store: AppStore
   var openSettings: () -> Void
+
   var body: some View {
     VStack(spacing: 0) {
-      HStack {
-        Image(nsImage: MenuBarController.icon())
-        Text("LLMeter").fontWeight(.semibold)
+      HStack(spacing: 10) {
+        Image(nsImage: MenuBarController.icon(size: 22))
+          .foregroundStyle(Color.accentColor)
+        VStack(alignment: .leading, spacing: 2) {
+          Text("LLM Meter").font(.system(size: 14, weight: .semibold))
+          Text("Usage overview").font(.system(size: 11)).foregroundStyle(.secondary)
+        }
         Spacer()
-        Text(store.settings.showRemaining ? "Remaining" : "Used").font(.caption).foregroundStyle(
-          .secondary)
-      }.padding(12)
+        Text(store.settings.showRemaining ? "Remaining" : "Used")
+          .font(.system(size: 10, weight: .medium))
+          .padding(.horizontal, 8).padding(.vertical, 4)
+          .background(Color.primary.opacity(0.06), in: Capsule())
+      }.padding(16)
       Divider()
       if let message = store.message {
-        Text(message).font(.caption).foregroundStyle(.red).padding(10)
+        Text(message).font(.caption).foregroundStyle(.red).padding(12)
       }
-      HStack {
-        Text("LLM").frame(maxWidth: .infinity, alignment: .leading)
-        Text("5h").frame(width: 105, alignment: .trailing)
-        Text("Weekly").frame(width: 105, alignment: .trailing)
-      }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12).padding(.vertical, 8)
+      HStack(spacing: 0) {
+        Text("SERVICE").frame(maxWidth: .infinity, alignment: .leading)
+        Text("5 HOURS").frame(width: 105, alignment: .trailing)
+        Text("WEEKLY").frame(width: 105, alignment: .trailing)
+      }.font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
+        .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 4)
       if store.visibleServices.isEmpty {
-        Text("No LLMs selected for display").foregroundStyle(.secondary).padding(12)
+        VStack(spacing: 8) {
+          Image(systemName: "list.bullet").font(.title2).foregroundStyle(.secondary)
+          Text("No services selected").font(.headline)
+          Text("Choose which LLMs to display in Settings.").font(.caption).foregroundStyle(
+            .secondary)
+        }.padding(24)
       } else {
         ScrollView {
           VStack(spacing: 0) {
-            ForEach(store.visibleServices) { service in
+            ForEach(Array(store.visibleServices.enumerated()), id: \.element.id) { index, service in
+              if index > 0 { Divider().padding(.vertical, 6) }
               if service.provider == .antigravity,
                 !store.antigravityPools.isEmpty || !store.antigravityModels.isEmpty
               {
                 antigravityRows
               } else {
-                HStack(spacing: 0) {
-                  VStack(alignment: .leading, spacing: 3) {
-                    Text(service.provider.name)
-                    Text(store.updateLabel(service.provider)).font(.caption2)
-                      .foregroundStyle(.secondary)
-                  }.frame(maxWidth: .infinity, alignment: .leading)
-                  window(service.provider, period: .fiveHours)
-                  window(service.provider, period: .weekly)
-                }
-                .monospacedDigit().padding(.horizontal, 12).padding(.vertical, 8)
-                .contentShape(Rectangle()).help(store.tooltip(service.provider))
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(
-                  "\(service.provider.name), 5 hours \(store.label(service.provider, period: .fiveHours)), weekly \(store.label(service.provider, period: .weekly)). \(store.tooltip(service.provider))"
-                )
+                serviceRow(service.provider)
               }
             }
-          }
-        }.frame(height: CGFloat(min(store.panelRows, 8) * 52))
+          }.padding(.horizontal, 16).padding(.bottom, 8)
+        }.frame(height: contentHeight)
       }
-      Divider().padding(.top, 6)
-      VStack(spacing: 0) {
+      Divider()
+      HStack(spacing: 8) {
         action(store.refreshing ? "Refreshing…" : "Refresh", symbol: "arrow.clockwise") {
           store.refresh()
-        }
-        .disabled(store.refreshing)
-        action("Settings…", symbol: "gearshape", action: openSettings)
-        action("Quit", symbol: "power") { NSApplication.shared.terminate(nil) }
-      }.padding(.vertical, 4)
+        }.disabled(store.refreshing)
+        action("Settings", symbol: "gearshape", action: openSettings)
+        Button("Quit") { NSApplication.shared.terminate(nil) }
+          .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.secondary)
+          .padding(.horizontal, 8).padding(.vertical, 8)
+      }.padding(12)
     }.frame(width: 380)
   }
+
+  private var contentHeight: CGFloat {
+    let rows = store.visibleServices.reduce(0) { total, service in
+      let count =
+        store.antigravityPools.isEmpty
+        ? store.antigravityModels.count : store.antigravityPools.count
+      return total + (service.provider == .antigravity && count > 0 ? 32 + count * 60 : 64)
+    }
+    return CGFloat(min(420, rows + max(0, store.visibleServices.count - 1) * 12 + 8))
+  }
+
+  private func serviceRow(_ id: ProviderID) -> some View {
+    HStack(spacing: 0) {
+      VStack(alignment: .leading, spacing: 5) {
+        Text(id.name).font(.system(size: 13, weight: .medium))
+        Text(store.updateLabel(id)).font(.system(size: 10)).foregroundStyle(.secondary)
+      }.frame(maxWidth: .infinity, alignment: .leading)
+      window(id, period: .fiveHours)
+      window(id, period: .weekly)
+    }.padding(.vertical, 10).contentShape(Rectangle()).help(store.tooltip(id))
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(
+        "\(id.name), 5 hours \(store.label(id, period: .fiveHours)), weekly \(store.label(id, period: .weekly)). \(store.tooltip(id))"
+      )
+  }
+
   private var antigravityRows: some View {
     VStack(alignment: .leading, spacing: 0) {
       HStack {
-        Text("Antigravity").fontWeight(.medium)
+        Text("Antigravity").font(.system(size: 13, weight: .medium))
         Spacer()
-        Text(store.updateLabel(.antigravity)).font(.caption2).foregroundStyle(.secondary)
-      }.padding(.vertical, 8)
+        Text(store.updateLabel(.antigravity)).font(.system(size: 10)).foregroundStyle(.secondary)
+      }.padding(.top, 10).padding(.bottom, 6)
       if !store.antigravityPools.isEmpty {
         ForEach(store.antigravityPools, id: \.self) { scope in
           HStack(spacing: 0) {
-            Text(String(scope.dropFirst(5))).font(.caption)
+            Text(String(scope.dropFirst(5))).font(.system(size: 11))
+              .foregroundStyle(.secondary).lineLimit(2)
               .frame(maxWidth: .infinity, alignment: .leading)
             window(.antigravity, period: .fiveHours, scope: scope)
             window(.antigravity, period: .weekly, scope: scope)
-          }.padding(.vertical, 8)
+          }.padding(.vertical, 10)
         }
       } else {
         ForEach(store.antigravityModels) { metric in
           HStack {
-            VStack(alignment: .leading, spacing: 3) {
-              Text(metric.name).font(.caption)
-              Text("Model quota · window unknown").font(.caption2).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+              Text(metric.name).font(.system(size: 11, weight: .medium))
+              Text("Model quota · window unknown").font(.system(size: 10)).foregroundStyle(
+                .secondary)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 3) {
-              Text(store.modelLabel(metric))
-              Text(UsageDisplay.resetCountdown(metric.resetAt, now: store.now)).font(.caption2)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .trailing, spacing: 5) {
+              value(store.modelLabel(metric))
+              Text(UsageDisplay.resetCountdown(metric.resetAt, now: store.now)).font(
+                .system(size: 10)
+              )
+              .foregroundStyle(.secondary)
             }
-          }.padding(.vertical, 8)
+          }.padding(.vertical, 10)
         }
       }
-    }.monospacedDigit().padding(.horizontal, 12).help(store.tooltip(.antigravity))
+    }.help(store.tooltip(.antigravity))
   }
+
+  private func value(_ label: String) -> some View {
+    Text(label).font(.system(size: 18, weight: .medium, design: .rounded)).monospacedDigit()
+      .foregroundStyle(label == "—" ? Color.secondary : Color.primary)
+  }
+
   private func window(_ id: ProviderID, period: MetricPeriod, scope: String? = nil) -> some View {
-    VStack(alignment: .trailing, spacing: 3) {
-      Text(store.label(id, period: period, scope: scope))
-      Text(store.resetLabel(id, period: period, scope: scope)).font(.caption2).foregroundStyle(
-        .secondary)
+    VStack(alignment: .trailing, spacing: 5) {
+      value(store.label(id, period: period, scope: scope))
+      Text(store.resetLabel(id, period: period, scope: scope)).font(.system(size: 10))
+        .monospacedDigit().foregroundStyle(.secondary)
     }.frame(width: 105, alignment: .trailing)
   }
+
   private func action(_ text: String, symbol: String, action: @escaping () -> Void) -> some View {
     Button(action: action) {
-      Label(text, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12).padding(.vertical, 7).contentShape(Rectangle())
-    }.buttonStyle(.plain)
+      Label(text, systemImage: symbol).font(.system(size: 11, weight: .medium))
+        .frame(maxWidth: .infinity).padding(.vertical, 8).contentShape(Rectangle())
+    }.buttonStyle(PanelActionStyle())
+  }
+}
+
+private struct PanelActionStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label.background(
+      Color.primary.opacity(configuration.isPressed ? 0.12 : 0.05),
+      in: RoundedRectangle(cornerRadius: 7))
   }
 }
 

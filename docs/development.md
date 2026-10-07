@@ -96,6 +96,8 @@ Store `settings.json` and `usage-cache.json` in `~/Library/Application Support/L
 
 The menu bar and panel share one snapshot store. The panel places reset countdowns beneath the simultaneous 5h/Weekly values and the age of the last successful update beneath each service name. Tooltips retain exact local reset/reading times and details for all metrics. Countdown calculations use the source-reported absolute timestamp and never renew usage locally. Current adapters do not supply reset-credit counts. Cached accounts remain unconfirmed until a successful fetch. A menu bar selection binds a stable account ID; when the signed-in account changes, users must select a metric again to bind the new account.
 
+The panel uses an accent-colored meter in its header, a used/remaining badge, rounded monospaced percentages, secondary countdowns, and fine service separators. Antigravity group names sit beneath their service heading. A horizontal footer provides Refresh, Settings, and Quit, with press feedback on the main actions. Native semantic colors adapt to appearance; text and VoiceOver descriptions preserve status meaning without relying on color.
+
 Automatic intervals respect provider minimums. Manual refresh coalesces in-flight requests and respects manual minimums and rate-limit cooldowns. Transient failures retain successful readings. Stale readings use `·`; hard-expired or reset-pending metrics show `—`. Failed automatic refreshes back off, while a user can retry non-rate-limited failures after the manual minimum.
 
 Sleep cancels in-flight work and suspends scheduling. Wake checks due sources once. Generation checks prevent cancelled or outdated source results from changing the current state. At most three initial providers can fetch concurrently.
