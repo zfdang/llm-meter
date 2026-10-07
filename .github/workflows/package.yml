@@ -18,9 +18,10 @@ jobs:
     name: Apple Silicon app
     runs-on: macos-15
     timeout-minutes: 15
-    # Only main pushes publish a release; pull requests build and verify only.
+    # Needed by the publish step below, which is gated to pushes to main.
+    # Fork pull requests still receive a read-only token from GitHub.
     permissions:
-      contents: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'write' || 'read' }}
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Derive release version
