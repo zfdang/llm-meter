@@ -22,8 +22,8 @@ An “LLM” in the interface represents a service or subscription account, such
 
 | Feature | Behavior |
 | --- | --- |
-| Menu bar presence | One menu bar item; no Dock icon or main window on launch by default |
-| Default icon | The application's monochrome circular thermometer or ring gauge icon, suitable for light and dark appearances |
+| Menu bar presence | One menu bar item; no Dock icon (`LSUIElement`) or main window on launch by default |
+| Default icon | The application's monochrome circular thermometer icon, suitable for light and dark appearances |
 | Selected service usage | Select a service, account, and quota window; show a dynamic ring gauge and short numeric label |
 | Usage panel | A compact list with one row per LLM and simultaneous 5h and Weekly columns |
 | Display selection | Select which LLMs appear in the list and configure their order |
@@ -32,7 +32,7 @@ An “LLM” in the interface represents a service or subscription account, such
 | Automatic and manual refresh | Periodic background refresh, refresh all, and individual source refresh |
 | Connection management | Discover supported local sign-in sources; enable, disable, and configure them in Settings |
 | Basic settings | Menu bar mode, selected metric, used/remaining display, refresh interval, and launch at login |
-| Error and cache states | Distinguish signed out, unread, refresh failed, rate limited, unsupported source, and stale data |
+| Error and cache states | Distinguish signed out, not yet read, refresh failed, rate limited, unsupported source, and stale data |
 
 Initially, monitor one currently signed-in account per service. Keep account identity in the data model, but defer multiple-account sign-in, switching, and aggregation.
 
@@ -48,9 +48,9 @@ Initially, monitor one currently signed-in account per service. Keep account ide
 
 ### 3.1 Menu Bar Modes
 
-**Default icon:** A fixed circular thermometer icon acts as the application entry point. It does not represent aggregate usage across services.
+**Default icon:** A fixed circular thermometer icon acts as the application entry point. It does not represent aggregate usage across services and must be visually distinct from the dynamic usage ring so it is never mistaken for a reading.
 
-**Service usage:** Bind a selection to `providerID + accountID + metricID`. A dynamic ring shows the window's used percentage, with a short label such as `CX 42%`. Used is the default numeric display; selecting remaining changes the label to `CX 58% left`. The ring always represents used allowance, as explained in the tooltip.
+**Service usage:** Bind a selection to `providerID + accountID + metricID`. A dynamic ring shows the window's used percentage, with a short label such as `CX 42%`. Each adapter declares a short label of at most three characters (for example, `CX` for Codex, `CC` for Claude Code, `AG` for Antigravity). Used is the default numeric display; selecting remaining changes the label to `CX 58% left`. The ring always represents used allowance, as explained in the tooltip.
 
 - Include a number so users can read usage without clicking; the ring provides a quick visual cue.
 - Initially select the adapter's declared primary window. Settings allows an explicit weekly or other metric selection.
@@ -69,13 +69,12 @@ Use a simple menu-style layout: title, usage rows, separators, and actions. Each
 
 ```text
 ┌────────────────────────────┐
-│ ◉ LLMeter                  │
+│ ◉ LLM Meter                │
 ├────────────────────────────┤
-│ LLM          5h     Weekly │
-│ Claude       72%       35% │
-│ ChatGPT      81%       46% │
-│ Codex        43%       18% │
-│ Gemini       91%         — │
+│ Used           5h   Weekly │
+│ Claude Code   72%      35% │
+│ Codex         43%      18% │
+│ Antigravity     —        — │
 ├────────────────────────────┤
 │ Refresh                    │
 │ Settings…                  │
@@ -83,7 +82,7 @@ Use a simple menu-style layout: title, usage rows, separators, and actions. Each
 └────────────────────────────┘
 ```
 
-Names, values, and periods above illustrate the layout, not verified plans or integration support. ChatGPT and Codex are separate potential integration targets: sharing an account does not justify reusing a quota or labeling the same data twice. Independent usage availability for ChatGPT and Gemini requires future validation. The initial release targets Codex, Claude Code, and Antigravity.
+Values and periods above illustrate the layout only; they are not verified plans or source semantics. Antigravity shows `—` until its periods are validated as genuine five-hour or weekly windows. Future providers (for example, ChatGPT or Gemini) are separate integration targets: a shared account does not justify reusing one quota under two labels.
 
 Default to used percentages and label the header “Used.” When remaining is selected, label it “Remaining” and use the same interpretation in both columns and the menu bar. Right-align values. Add `·` to stale readings and explain the marker in a tooltip. Show `—` for missing, unsupported, or hard-expired metrics, with the reason in the tooltip. Keep existing values during refresh and show progress on the Refresh action.
 
@@ -140,6 +139,7 @@ flowchart TD
     B --> D[UsageStore · MainActor]
     C --> D
     D --> E[RefreshCoordinator · actor]
+    E -. publish results .-> D
     E --> F[ProviderAdapter registry]
     F --> G[Network or CLI source]
     F --> H[CredentialResolver]
@@ -221,7 +221,7 @@ Initial support targets are **Codex, Claude Code, and Antigravity**. All three a
 | Antigravity | First validate locally accessible client usage sources, then select an adapter access method | Account identity, access permissions, model/shared-pool scope, reset periods, weekly availability, and refresh limits |
 | Future providers | Prefer explicit usage/balance APIs or the tool's own query interface | Authentication, accounting scope, rate limits, and minimum permissions; an inference API key does not imply subscription quota access |
 
-The candidate Codex path `/wham/usage` is an internal client endpoint, not a stable public API contract. Validate Claude's behavior against the installed official tool. Record source versions and redacted response fixtures. If validation fails, show “Unsupported source” rather than guessing how to parse it.
+The candidate Codex path `/wham/usage` is an internal client endpoint, not a stable public API contract. Validate Claude's behavior against the installed official tool. In particular, confirm that `claude -p /usage` is handled locally as a slash command: if a CLI version does not recognize it in print mode, the text may be sent to the model as a prompt and consume the very quota being measured. The adapter must check the CLI version against a validated range and must never fall back to an inference request. Record source versions and redacted response fixtures. If validation fails, show “Unsupported source” rather than guessing how to parse it.
 
 Adapters expose `discoverSources()`, `fetchUsage(source)`, and `capabilities`. Capabilities declare supported metrics, a primary metric, complete-snapshot support, and minimum automatic/manual refresh intervals. The UI must not assume every service has both five-hour and seven-day windows.
 
@@ -270,7 +270,7 @@ Store configuration and caches in `~/Library/Application Support/LLM Meter/`:
 - `settings.json`: schemaVersion, source references, display selection, and refresh settings.
 - `usage-cache.json`: schemaVersion, latest successful snapshots, and reading times; no tokens, API keys, or raw responses.
 
-Write through temporary files and atomic replacement. Restrict directory access to the current user; suggested file permissions are 0600. Reject writeback for unknown newer schemas and explain incompatibility to avoid destructive downgrade writes. Store application-owned secrets only in Keychain, with references in configuration. External tools retain ownership of their credentials.
+Write through temporary files and atomic replacement. Restrict access to the current user: suggested permissions are 0700 for the directory and 0600 for files. Reject writeback for unknown newer schemas and explain incompatibility to avoid destructive downgrade writes. Store application-owned secrets only in Keychain, with references in configuration. External tools retain ownership of their credentials.
 
 Do not upload data, collect conversation content, or scan unrelated directories by default. Logs contain only source IDs, durations, and error categories, without authentication headers, full identity details, or raw CLI output.
 
