@@ -1,6 +1,6 @@
 # LLM Meter Design
 
-Status: Initial design; application not yet implemented.
+Status: Design baseline with an initial implementation. See [Development](development.md) for implemented behavior, validation, and remaining work.
 
 Date: 2026-10-07.
 
@@ -179,7 +179,7 @@ docs/
   design.md
 ```
 
-This is a proposed implementation layout; the application project has not yet been created.
+The SwiftPM implementation separates `Sources/LLMMeterApp` and `Sources/LLMMeterCore`; see [Development](development.md) for the actual module layout.
 
 ## 6. Data Model and Usage Semantics
 
