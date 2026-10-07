@@ -18,12 +18,15 @@ jobs:
     name: Apple Silicon app
     runs-on: macos-15
     timeout-minutes: 15
-    # Needed by the publish step below, which is gated to pushes to main.
-    # Fork pull requests still receive a read-only token from GitHub.
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      revision: ${{ steps.version.outputs.revision }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Derive release version
         id: version
         run: |
@@ -56,12 +59,25 @@ jobs:
             build/LLM-Meter-arm64.zip.sha256
           if-no-files-found: error
           retention-days: 30
+  release:
+    name: Publish main release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: package
+    runs-on: macos-15
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: LLM-Meter-arm64
+          path: build
       - name: Publish release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.version.outputs.tag }}
-          REVISION: ${{ steps.version.outputs.revision }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.package.outputs.tag }}
+          REVISION: ${{ needs.package.outputs.revision }}
         run: |
           notes="$(cat <<'NOTES'
           Automated arm64 build of `main` at ${{ env.REVISION }}.
