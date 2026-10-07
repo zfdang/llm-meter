@@ -13,6 +13,15 @@ trap 'rm -rf "$icon_directory" "$staging_directory"' EXIT
 mkdir -p "$staged_app/Contents/MacOS" "$staged_app/Contents/Resources"
 cp "$binary_directory/LLMMeter" "$staged_app/Contents/MacOS/LLMMeter"
 cp Resources/Info.plist "$staged_app/Contents/Info.plist"
+# Optional release stamp supplied by CI; local builds keep the committed version.
+if [ -n "${VERSION:-}" ]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
+        "$staged_app/Contents/Info.plist"
+fi
+if [ -n "${BUILD_NUMBER:-}" ]; then
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" \
+        "$staged_app/Contents/Info.plist"
+fi
 cp -R "$binary_directory/LLMMeter_LLMMeterApp.bundle" "$staged_app/Contents/Resources/"
 mkdir -p "$icon_directory/AppIcon.iconset"
 "$binary_directory/LLMMeter" --export-icon "$icon_directory/icon.png"

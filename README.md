@@ -28,11 +28,19 @@ open "build/LLM Meter.app"
 
 `make app` creates an arm64 application with a local ad-hoc signature and a `build/LLM-Meter-arm64.zip` archive that preserves executable permissions. `SIGNING_IDENTITY` can supply a Developer ID identity; notarization is a separate distribution step. For launch at login, place the bundle in a stable location such as `/Applications` before enabling the setting.
 
-## GitHub Builds
+## GitHub Builds and Releases
 
-[CI](https://github.com/zfdang/llm-meter/actions/workflows/ci.yml) checks Swift formatting and runs the tests on pull requests and pushes to main. [Package macOS app](https://github.com/zfdang/llm-meter/actions/workflows/package.yml) builds and verifies the arm64 app on pull requests, main, and `v*` tags. Both workflows can also be run manually after they land on the default branch.
+[CI](https://github.com/zfdang/llm-meter/actions/workflows/ci.yml) checks Swift formatting and runs the tests on pull requests and pushes to main. [Package macOS app](https://github.com/zfdang/llm-meter/actions/workflows/package.yml) builds and verifies the arm64 app on pull requests, main, and manual dispatch.
 
-Download the `LLM-Meter-arm64` artifact from a successful packaging run. It contains the app ZIP and a SHA-256 checksum. These development builds are ad hoc signed and **not notarized**. Public distribution requires Developer ID signing and Apple notarization; the workflow does not publish a GitHub Release automatically.
+Every merge to `main` publishes a release automatically. Its tag is the build date plus the commit's short revision, in `Asia/Shanghai` time, for example `v2026.10.07-3e5e7de`. Each release contains `LLM-Meter-arm64.zip` and its SHA-256 checksum; the bundled app carries the same version string. The run's `LLM-Meter-arm64` artifact keeps the same files for 30 days, and re-running a commit refreshes the release assets instead of creating a duplicate.
+
+Download the ZIP from the [latest release](https://github.com/zfdang/llm-meter/releases/latest) and verify it:
+
+```sh
+shasum -a 256 -c LLM-Meter-arm64.zip.sha256
+```
+
+These development builds are ad hoc signed and **not notarized**. macOS may block them on first launch: right-click and choose Open, or remove the quarantine attribute. Public distribution requires Developer ID signing and Apple notarization.
 
 ## Providers
 
