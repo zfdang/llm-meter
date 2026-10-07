@@ -425,6 +425,13 @@ struct SettingsView: View {
         }.padding(16)
       }.tabItem { Label(L10n.text("Services"), systemImage: "list.bullet") }
       Form {
+        LabeledContent(L10n.text("Version")) {
+          Text(AppVersion.current.version ?? L10n.text("Development build"))
+            .textSelection(.enabled)
+        }
+        LabeledContent(L10n.text("Build")) {
+          Text(AppVersion.current.build ?? "—").textSelection(.enabled)
+        }
         Picker(L10n.text("Refresh interval"), selection: binding(\.refreshMinutes)) {
           ForEach([1, 3, 5, 10], id: \.self) { Text(L10n.format("%@ minutes", String($0))).tag($0) }
         }

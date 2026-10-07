@@ -63,6 +63,8 @@ Copilot quota reads depend on GitHub's undocumented `/copilot_internal/user` end
 
 Unknown or unsupported periods display `—`. Antigravity's quota groups keep separate 5h/Weekly values; when the client supplies only model quotas, the panel shows each model with an unknown window duration. All metrics are available in the details panel, Settings, and the menu bar metric picker. Claude Code has fixture coverage; its live subscription read still requires a suitable local login source.
 
+The running application’s version and build number are available in **Settings → General** and can be selected and copied. Unbundled development runs show “Development build”.
+
 ## Diagnostics
 
 ```sh
