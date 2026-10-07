@@ -101,6 +101,7 @@ final class MenuBarController: NSObject {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+  private var terminating = false
   var controller: MenuBarController?
   var store: AppStore?
   func applicationDidFinishLaunching(_ notification: Notification) {
@@ -150,7 +151,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     return true
   }
   @objc func openSettings() { controller?.showSettings() }
-  func applicationWillTerminate(_ notification: Notification) { store?.stop() }
+  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    guard let store else { return .terminateNow }
+    guard !terminating else { return .terminateLater }
+    terminating = true
+    Task {
+      await store.stop()
+      sender.reply(toApplicationShouldTerminate: true)
+    }
+    return .terminateLater
+  }
 }
 
 let arguments = CommandLine.arguments

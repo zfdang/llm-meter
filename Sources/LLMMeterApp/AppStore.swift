@@ -110,7 +110,7 @@ final class AppStore: ObservableObject {
       })
     Task { await coordinator.refresh() }
   }
-  func stop() {
+  func stop() async {
     persistCacheIfNeeded()
     timer?.invalidate()
     timer = nil
@@ -118,7 +118,8 @@ final class AppStore: ObservableObject {
     eventTask = nil
     for observer in observers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
     observers.removeAll()
-    Task { await coordinator.suspend() }
+    await coordinator.suspend()
+    await ProcessRunner.finishTerminationSignals()
   }
   private func persistCacheIfNeeded() {
     guard cacheWritable, cacheDirty else { return }

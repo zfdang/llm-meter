@@ -75,10 +75,21 @@ public protocol CommandRunning: Sendable {
 /// Owns and reaps one child. Launch, cancellation, and waitpid share the lock so a
 /// child PID cannot be reaped/reused while shutdown is still signaling its group.
 private final class ProcessControl: @unchecked Sendable {
+  static let terminationSignals = DispatchGroup()
+  /// Stop polling for a child that survived group SIGKILL, e.g. stuck in D-state.
+  private static let reapTimeLimit: TimeInterval = 30
   private let lock = NSLock()
   private var pid: pid_t?
   private var status: Int32?
   private var cancelled = false
+  private var stopping = false
+  private var escalated = false
+  private var reapDeadline: Date?
+  var isCancelled: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return cancelled
+  }
 
   func launch(
     executable: String, arguments: [String], environment: [String: String],
@@ -104,6 +115,8 @@ private final class ProcessControl: @unchecked Sendable {
       posix_spawnattr_setflags(
         &attributes, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT)))
     try check(posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0))
+    // Standard streams intentionally survive exec so CLI descendants can report
+    // output. A descendant that leaves our group may retain these descriptors.
     try check(posix_spawn_file_actions_adddup2(&actions, output, STDOUT_FILENO))
     try check(posix_spawn_file_actions_adddup2(&actions, errors, STDERR_FILENO))
     // The _np variant also exists in SDKs for our macOS 13 deployment target.
@@ -129,10 +142,13 @@ private final class ProcessControl: @unchecked Sendable {
     defer { lock.unlock() }
     if let status { return status }
     guard let pid else { return nil }
+    // Reserve the leader's PID until group escalation, even if TERM made it exit.
+    if stopping && !escalated { return nil }
     var value: Int32 = 0
     let result = waitpid(pid, &value, WNOHANG)
     if result == 0 || (result == -1 && errno == EINTR) { return nil }
     guard result == pid else {
+      if result == -1 && errno == ECHILD { self.pid = nil }
       throw MeterError.connection("Cannot wait for the CLI executable.")
     }
     status = Self.exitStatus(value)
@@ -143,18 +159,55 @@ private final class ProcessControl: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     cancelled = true
-    guard let pid, status == nil else { return }
+    guard pid != nil, status == nil, !stopping else { return }
+    stopping = true
+    Self.terminationSignals.enter()
     // Keep the leader unreaped until escalation, even if it exits on SIGTERM:
     // grandchildren that ignore SIGTERM still receive the group SIGKILL.
-    kill(-pid, SIGTERM)
-    kill(pid, SIGTERM)
-    Thread.sleep(forTimeInterval: 0.15)
-    kill(-pid, SIGKILL)
-    kill(pid, SIGKILL)
-    var value: Int32 = 0
-    var result: pid_t
-    repeat { result = waitpid(pid, &value, 0) } while result == -1 && errno == EINTR
-    if result == pid { status = Self.exitStatus(value) }
+    signal(SIGTERM)
+    DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.15) {
+      self.escalate()
+    }
+  }
+
+  // Called only while locked and while the child remains unreaped.
+  private func signal(_ value: Int32) {
+    guard let pid else { return }
+    let groupSignaled = kill(-pid, value) == 0
+    // The group signal already reaches its leader. Signal the PID separately
+    // only if the group is gone or the child moved to another process group.
+    if !groupSignaled || getpgid(pid) != pid { kill(pid, value) }
+  }
+
+  private func escalate() {
+    lock.lock()
+    signal(SIGKILL)
+    escalated = true
+    // Bound reaping: a child that survives SIGKILL must not poll forever.
+    reapDeadline = Date().addingTimeInterval(Self.reapTimeLimit)
+    lock.unlock()
+    Self.terminationSignals.leave()
+    reapLater()
+  }
+
+  private func reapLater() {
+    // Never block an actor, the main thread, or a dispatch worker in waitpid.
+    // Uninterruptible I/O can delay exit after KILL; retain ownership and retry.
+    do {
+      if try pollStatus() != nil { return }
+    } catch { return }
+    lock.lock()
+    let expired = reapDeadline.map { Date() >= $0 } ?? false
+    if expired {
+      // Give up ownership after the bound: the zombie stays with the kernel until
+      // our process exits and it is reparented; no further polling or signaling.
+      pid = nil
+    }
+    lock.unlock()
+    if expired { return }
+    DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.25) {
+      self.reapLater()
+    }
   }
 
   private static func exitStatus(_ value: Int32) -> Int32 {
@@ -203,10 +256,13 @@ public struct ProcessRunner: CommandRunning {
           directory: directory.path, output: output.fileDescriptor, errors: errors.fileDescriptor)
         defer { control.stop() }
         let deadline = Date().addingTimeInterval(timeout)
-        var status: Int32?
-        while status == nil {
-          status = try control.pollStatus()
-          if status != nil { break }
+        let status: Int32
+        while true {
+          if control.isCancelled { throw MeterError.cancelled }
+          if let result = try control.pollStatus() {
+            status = result
+            break
+          }
           if Date() >= deadline {
             control.stop()
             throw MeterError.timeout
@@ -228,13 +284,22 @@ public struct ProcessRunner: CommandRunning {
           }
         }
         return CommandResult(
-          output: try Data(contentsOf: outputURL), status: status ?? -1)
+          output: try Data(contentsOf: outputURL), status: status)
       }
       let result = try await worker.value
       try Task.checkCancellation()
       return result
     } onCancel: {
       control.stop()
+    }
+  }
+  /// Wait for pending group KILL signals without waiting on OS process exit.
+  /// Call after cancelling source tasks and before completing app termination.
+  public static func finishTerminationSignals() async {
+    await withCheckedContinuation { continuation in
+      ProcessControl.terminationSignals.notify(queue: .global(qos: .utility)) {
+        continuation.resume()
+      }
     }
   }
   public static var searchPaths: [String] {
