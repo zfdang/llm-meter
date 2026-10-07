@@ -21,8 +21,8 @@ struct UsagePanel: View {
       }
       HStack {
         Text("LLM").frame(maxWidth: .infinity, alignment: .leading)
-        Text("5h").frame(width: 60, alignment: .trailing)
-        Text("Weekly").frame(width: 65, alignment: .trailing)
+        Text("5h").frame(width: 105, alignment: .trailing)
+        Text("Weekly").frame(width: 105, alignment: .trailing)
       }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12).padding(.vertical, 8)
       if store.visibleServices.isEmpty {
         Text("No LLMs selected for display").foregroundStyle(.secondary).padding(12)
@@ -31,11 +31,13 @@ struct UsagePanel: View {
           VStack(spacing: 0) {
             ForEach(store.visibleServices) { service in
               HStack(spacing: 0) {
-                Text(service.provider.name).frame(maxWidth: .infinity, alignment: .leading)
-                Text(store.label(service.provider, period: .fiveHours)).frame(
-                  width: 60, alignment: .trailing)
-                Text(store.label(service.provider, period: .weekly)).frame(
-                  width: 65, alignment: .trailing)
+                VStack(alignment: .leading, spacing: 3) {
+                  Text(service.provider.name)
+                  Text(store.updateLabel(service.provider)).font(.caption2)
+                    .foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, alignment: .leading)
+                window(service.provider, period: .fiveHours)
+                window(service.provider, period: .weekly)
               }
               .monospacedDigit().padding(.horizontal, 12).padding(.vertical, 8)
               .contentShape(Rectangle()).help(store.tooltip(service.provider))
@@ -45,7 +47,7 @@ struct UsagePanel: View {
               )
             }
           }
-        }.frame(height: CGFloat(min(store.visibleServices.count, 8) * 34))
+        }.frame(height: CGFloat(min(store.visibleServices.count, 8) * 52))
       }
       Divider().padding(.top, 6)
       VStack(spacing: 0) {
@@ -56,7 +58,13 @@ struct UsagePanel: View {
         action("Settings…", symbol: "gearshape", action: openSettings)
         action("Quit", symbol: "power") { NSApplication.shared.terminate(nil) }
       }.padding(.vertical, 4)
-    }.frame(width: 310)
+    }.frame(width: 380)
+  }
+  private func window(_ id: ProviderID, period: MetricPeriod) -> some View {
+    VStack(alignment: .trailing, spacing: 3) {
+      Text(store.label(id, period: period))
+      Text(store.resetLabel(id, period: period)).font(.caption2).foregroundStyle(.secondary)
+    }.frame(width: 105, alignment: .trailing)
   }
   private func action(_ text: String, symbol: String, action: @escaping () -> Void) -> some View {
     Button(action: action) {

@@ -4,6 +4,29 @@ import Testing
 @testable import LLMMeterCore
 
 private let instant = Date(timeIntervalSince1970: 1_790_000_000)
+
+@Test func displayTimesDistinguishUnknownPassedAndUpcomingResets() {
+  #expect(UsageDisplay.resetCountdown(nil, now: instant) == "Reset unknown")
+  #expect(UsageDisplay.resetCountdown(instant, now: instant) == "Awaiting update")
+  #expect(
+    UsageDisplay.resetCountdown(instant.addingTimeInterval(-60), now: instant)
+      == "Awaiting update")
+  #expect(
+    UsageDisplay.resetCountdown(instant.addingTimeInterval(59), now: instant) == "Resets <1m")
+  #expect(
+    UsageDisplay.resetCountdown(instant.addingTimeInterval(3660), now: instant)
+      == "Resets in 1h 1m")
+  #expect(
+    UsageDisplay.resetCountdown(instant.addingTimeInterval(90_000), now: instant)
+      == "Resets in 1d 1h")
+  #expect(
+    UsageDisplay.updateAge(instant.addingTimeInterval(60), now: instant) == "Updated just now")
+  #expect(
+    UsageDisplay.updateAge(instant.addingTimeInterval(-60), now: instant) == "Updated 1m ago")
+  #expect(
+    UsageDisplay.updateAge(instant.addingTimeInterval(-7200), now: instant) == "Updated 2h 0m ago")
+}
+
 private func reading(
   provider: ProviderID = .codex, account: String = "account-a", used: Double = 42
 ) -> UsageSnapshot {

@@ -90,7 +90,7 @@ Current limitation: automatic Antigravity desktop sign-in discovery and native C
 
 Store `settings.json` and `usage-cache.json` in `~/Library/Application Support/LLM Meter/`. Files use 0600 permissions and atomic replacement. Credentials and raw responses are excluded. On unreadable or unsupported storage, preserve the original file and prevent automatic replacement. To recover manually, quit the app, move the affected file aside, and relaunch.
 
-The menu bar and panel share one snapshot store. Cached accounts remain unconfirmed until a successful fetch. A menu bar selection binds a stable account ID; when the signed-in account changes, users must select a metric again to bind the new account.
+The menu bar and panel share one snapshot store. The panel places reset countdowns beneath the simultaneous 5h/Weekly values and the age of the last successful update beneath each service name. Tooltips retain exact local reset/reading times and details for all metrics. Countdown calculations use the source-reported absolute timestamp and never renew usage locally. Current adapters do not supply reset-credit counts. Cached accounts remain unconfirmed until a successful fetch. A menu bar selection binds a stable account ID; when the signed-in account changes, users must select a metric again to bind the new account.
 
 Automatic intervals respect provider minimums. Manual refresh coalesces in-flight requests and respects manual minimums and rate-limit cooldowns. Transient failures retain successful readings. Stale readings use `·`; hard-expired or reset-pending metrics show `—`. Failed automatic refreshes back off, while a user can retry non-rate-limited failures after the manual minimum.
 

@@ -180,6 +180,23 @@ final class AppStore: ObservableObject {
       metric(id, period: period), now: now, interval: interval(id),
       remaining: settings.showRemaining) ?? "—"
   }
+  func resetLabel(_ id: ProviderID, period: MetricPeriod) -> String {
+    guard settings.services.first(where: { $0.provider == id })?.enabled == true,
+      let metric = metric(id, period: period)
+    else { return "—" }
+    return UsageDisplay.resetCountdown(metric.resetAt, now: now)
+  }
+  func updateLabel(_ id: ProviderID) -> String {
+    guard settings.services.first(where: { $0.provider == id })?.enabled == true else {
+      return "Monitoring off"
+    }
+    guard let state = states[id] else { return "Not read yet" }
+    if state.refreshing { return "Refreshing…" }
+    if let snapshot = state.snapshot {
+      return UsageDisplay.updateAge(snapshot.readAt, now: now)
+    }
+    return state.error == nil ? "Not read yet" : "Unable to refresh"
+  }
   var selectedMetric: UsageMetric? {
     guard let state = states[settings.selectedProvider], let snapshot = state.snapshot,
       state.confirmed, settings.selectedAccountID == snapshot.accountID
@@ -227,8 +244,11 @@ final class AppStore: ObservableObject {
           lines.append(
             reset <= now
               ? "Awaiting update after reset"
-              : "Resets \(reset.formatted(date: .abbreviated, time: .shortened))")
+              : "\(UsageDisplay.resetCountdown(reset, now: now)) · \(reset.formatted(date: .abbreviated, time: .shortened))"
+          )
         }
+        if metric.pendingConfirmation { lines.append("Retained reading · awaiting confirmation") }
+        lines.append(UsageDisplay.updateAge(metric.readAt, now: now))
         lines.append("Read \(metric.readAt.formatted(date: .abbreviated, time: .shortened))")
       }
     } else if state.error == nil {
