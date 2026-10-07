@@ -23,8 +23,8 @@ An “LLM” in the interface represents a service or subscription account, such
 | Feature | Behavior |
 | --- | --- |
 | Menu bar presence | One menu bar item; no Dock icon (`LSUIElement`) or main window on launch by default |
-| Default icon | The application's monochrome circular thermometer icon, suitable for light and dark appearances |
-| Selected service usage | Select a service, account, and quota window; show a dynamic ring gauge and short numeric label |
+| Default icon | A monochrome open-arc meter icon, suitable for light and dark appearances |
+| Selected service usage | Select a service, account, and quota window; show a short service label and percentage without an icon |
 | Usage panel | A compact list with one row per LLM and simultaneous 5h and Weekly columns |
 | Display selection | Select which LLMs appear in the list and configure their order |
 | Multiple quota windows | Keep short-term, weekly, and model-pool allowances separate |
@@ -48,18 +48,18 @@ Initially, monitor one currently signed-in account per service. Keep account ide
 
 ### 3.1 Menu Bar Modes
 
-**Default icon:** A fixed circular thermometer icon acts as the application entry point. It does not represent aggregate usage across services and must be visually distinct from the dynamic usage ring so it is never mistaken for a reading.
+**Default icon:** A fixed open-arc meter with a needle acts as the application entry point. It does not represent aggregate usage across services.
 
-**Service usage:** Bind a selection to `providerID + accountID + metricID`. A dynamic ring shows the window's used percentage, with a short label such as `CX 42%`. Each adapter declares a short label of at most three characters (for example, `CX` for Codex, `CC` for Claude Code, `AG` for Antigravity). Used is the default numeric display; selecting remaining changes the label to `CX 58% left`. The ring always represents used allowance, as explained in the tooltip.
+**Service usage:** Bind a selection to `providerID + accountID + metricID`. Display only a short service label and the selected window's percentage, such as `CX 42%`. Each adapter declares a short label of at most three characters (for example, `CX` for Codex, `CC` for Claude Code, `AG` for Antigravity). Used is the default numeric display; selecting remaining changes the label to `CX 58% left`.
 
-- Include a number so users can read usage without clicking; the ring provides a quick visual cue.
+- Include a number so users can read usage without clicking. Omit the icon in this mode to reduce menu bar width.
 - Initially select the adapter's declared primary window. Settings allows an explicit weekly or other metric selection.
 - Keep the selection stable across refreshes rather than automatically choosing the most-used window.
-- For balance metrics, show a short name and amount, such as `API $12.34`. Use a static icon when there is no quota limit.
+- For balance metrics, show a short name and amount, such as `API $12.34`. Keep the same text-only presentation when there is no quota limit.
 - If the source only provides percentages, show remaining as a percentage without inferring token or request counts.
 - If the target disappears, has no data, or no longer exposes the selected window, show `CX —`, explain why, and offer reselection. Do not silently bind another account.
 - Mark retained readings as stale, for example `CX 42%·`. Tooltips and the panel show the reading time and current error. After hard expiration, the menu bar shows `—`; the panel retains the historical reading.
-- Allow numeric overages such as `105%`; cap ring fill at 100% and remaining allowance at zero.
+- Allow numeric overages such as `105%`; cap remaining allowance at zero.
 
 Keep one menu bar item. Multiple simultaneous services, stacked window labels, and rotating selections are outside the initial release.
 
@@ -120,7 +120,7 @@ LLM Meter's own requirements define its product identity, scope, and interaction
 
 Use **Swift + AppKit + SwiftUI**, with a provisional minimum of **macOS 13**, building only for **Apple Silicon (arm64)**.
 
-- AppKit manages `NSStatusItem`, dynamic menu bar images, `NSPopover`, and application lifecycle.
+- AppKit manages `NSStatusItem`, menu bar images and text, `NSPopover`, and application lifecycle.
 - SwiftUI renders the compact usage list and Settings window inside native hosts.
 - Swift concurrency isolates state and manages asynchronous work; use URLSession for network sources and Process for CLI sources.
 - Store application-owned credentials in Keychain and configuration and credential-free usage caches in local JSON.
@@ -280,7 +280,7 @@ Initially distribute a signed and notarized `.app` directly. Do not base the fir
 
 ### Stage 1: Native Shell and Mock Data
 
-Create the macOS project, menu bar entry, fixed icon, mock 5h/Weekly list, Settings window, and dynamic usage mode. Validate toggling, keyboard interaction, light/dark appearance, display scaling, and constrained menu bar space. Clearly label mock data and keep it separate from real services.
+Create the macOS project, menu bar entry, fixed icon, mock 5h/Weekly list, Settings window, and text-only usage mode. Validate toggling, keyboard interaction, light/dark appearance, display scaling, and constrained menu bar space. Clearly label mock data and keep it separate from real services.
 
 ### Stage 2: First Real Source
 
@@ -298,7 +298,7 @@ On Apple Silicon Macs, validate launch at login, single-instance behavior, exit 
 
 - Codex, Claude Code, and Antigravity pass real-source integration validation and can be selected for the list and menu bar metrics.
 - Launch creates one menu bar item; initial network waits do not block its appearance or panel interaction.
-- Default mode uses the circular thermometer icon. Usage mode fixes an account and metric and correctly displays used or remaining values.
+- Default mode uses the open-arc meter icon. Usage mode fixes an account and metric and correctly displays used or remaining values.
 - The panel includes only selected LLMs, with simultaneous 5h and Weekly columns; unknown and unsupported periods show `—`.
 - Display selection and order survive restart. Hidden services can remain menu bar targets; sources neither displayed nor selected receive no scheduled refresh.
 - The menu bar and panel share snapshots and update together after refresh.

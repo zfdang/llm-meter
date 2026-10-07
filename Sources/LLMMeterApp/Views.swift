@@ -9,7 +9,7 @@ struct UsagePanel: View {
   var body: some View {
     VStack(spacing: 0) {
       HStack {
-        Image(systemName: "gauge.with.dots.needle.50percent")
+        Image(nsImage: MenuBarController.icon())
         Text("LLMeter").fontWeight(.semibold)
         Spacer()
         Text(store.settings.showRemaining ? "Remaining" : "Used").font(.caption).foregroundStyle(
@@ -108,7 +108,7 @@ struct SettingsView: View {
           Text("Remaining").tag(true)
         }
         Text(
-          "The ring always shows used allowance. Select a metric after its first successful refresh."
+          "Service usage shows a short service label and percentage without an icon. Select a metric after its first successful refresh."
         )
         .font(.caption).foregroundStyle(.secondary)
         if let snapshot = store.states[store.settings.selectedProvider]?.snapshot,

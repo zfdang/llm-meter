@@ -214,14 +214,6 @@ final class AppStore: ObservableObject {
         remaining: settings.showRemaining) ?? "—" : "—"
     return "\(id.abbreviation) \(label)\(settings.showRemaining && label != "—" ? " left" : "")"
   }
-  var ringUsedPercent: Double? {
-    guard settings.showUsage, let metric = selectedMetric,
-      let state = states[settings.selectedProvider],
-      settings.services.first(where: { $0.provider == settings.selectedProvider })?.enabled == true
-    else { return nil }
-    let freshness = state.freshness(metric, now: now, interval: interval(settings.selectedProvider))
-    return freshness == .expired || freshness == .awaitingReset ? nil : metric.usedPercent
-  }
   func tooltip(_ id: ProviderID) -> String {
     guard let state = states[id] else { return "Not read yet" }
     var lines = [id.name]

@@ -25,42 +25,36 @@ final class MenuBarController: NSObject {
     render()
   }
   func render() {
-    item.button?.image = Self.icon(used: store.ringUsedPercent)
-    item.button?.title = store.menuBarLabel.isEmpty ? "" : " " + store.menuBarLabel
+    item.button?.image = store.settings.showUsage ? nil : Self.icon()
+    item.button?.imagePosition = store.settings.showUsage ? .noImage : .imageOnly
+    item.button?.title = store.menuBarLabel
     item.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
     item.button?.toolTip =
       store.settings.showUsage
       ? store.tooltip(store.settings.selectedProvider) : "LLM Meter · Click to view usage"
     item.button?.setAccessibilityLabel(store.settings.showUsage ? store.menuBarLabel : "LLM Meter")
   }
-  static func icon(used: Double?, size: CGFloat = 18) -> NSImage {
-    let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { bounds in
-      NSColor.labelColor.setStroke()
-      let inset = size * 0.16
-      let circle = NSBezierPath(ovalIn: bounds.insetBy(dx: inset, dy: inset))
-      circle.lineWidth = size * 0.1
-      circle.stroke()
-      let center = NSPoint(x: size / 2, y: size / 2)
-      if let used, used.isFinite {
-        let arc = NSBezierPath()
-        arc.appendArc(
-          withCenter: center, radius: size * 0.25, startAngle: 90,
-          endAngle: 90 - CGFloat(min(100, max(0, used))) * 3.6, clockwise: true)
-        arc.lineWidth = size * 0.16
-        arc.lineCapStyle = .round
-        if used > 0 { arc.stroke() }
-      } else {
-        let needle = NSBezierPath()
-        needle.move(to: center)
-        needle.line(to: NSPoint(x: size * 0.65, y: size * 0.73))
-        needle.lineWidth = size * 0.1
-        needle.lineCapStyle = .round
-        needle.stroke()
-        NSColor.labelColor.setFill()
-        NSBezierPath(
-          ovalIn: NSRect(x: size * 0.4, y: size * 0.4, width: size * 0.2, height: size * 0.2)
-        ).fill()
-      }
+  static func icon(size: CGFloat = 18, color: NSColor = .black) -> NSImage {
+    let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
+      color.setStroke()
+      let center = NSPoint(x: size * 0.5, y: size * 0.43)
+      let arc = NSBezierPath()
+      arc.appendArc(
+        withCenter: center, radius: size * 0.37, startAngle: 210,
+        endAngle: -30, clockwise: true)
+      arc.lineWidth = size * 0.09
+      arc.lineCapStyle = .round
+      arc.stroke()
+      let needle = NSBezierPath()
+      needle.move(to: center)
+      needle.line(to: NSPoint(x: size * 0.69, y: size * 0.64))
+      needle.lineWidth = size * 0.09
+      needle.lineCapStyle = .round
+      needle.stroke()
+      color.setFill()
+      NSBezierPath(
+        ovalIn: NSRect(x: size * 0.425, y: size * 0.355, width: size * 0.15, height: size * 0.15)
+      ).fill()
       return true
     }
     image.isTemplate = true
@@ -174,10 +168,9 @@ if arguments.contains("--diagnose") {
   NSBezierPath(
     roundedRect: NSRect(x: 32, y: 32, width: 960, height: 960), xRadius: 210, yRadius: 210
   ).fill()
-  NSAppearance(named: .darkAqua)?.performAsCurrentDrawingAppearance {
-    MenuBarController.icon(used: nil, size: 640).draw(
-      in: NSRect(x: 192, y: 192, width: 640, height: 640))
-  }
+  let symbol = MenuBarController.icon(size: 640, color: .white)
+  symbol.isTemplate = false
+  symbol.draw(in: NSRect(x: 192, y: 192, width: 640, height: 640))
   NSGraphicsContext.restoreGraphicsState()
   try rep.representation(using: .png, properties: [:])!.write(
     to: URL(fileURLWithPath: arguments[index + 1]))
