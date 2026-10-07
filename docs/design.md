@@ -4,7 +4,7 @@ Status: Design baseline with an initial implementation. See [Development](develo
 
 Date: 2026-10-07.
 
-Scope: macOS on Apple Silicon (arm64) only. Initial providers: Codex, Claude Code, and Antigravity. The minimum OS version, technology choices, and integration methods may be adjusted after validation.
+Scope: macOS on Apple Silicon (arm64) only. Initial providers: Codex, Claude Code, Antigravity, and GitHub Copilot. The minimum OS version, technology choices, and integration methods may be adjusted after validation.
 
 ## 1. Product Goals
 
@@ -24,7 +24,7 @@ An “LLM” in the interface represents a service or subscription account, such
 | --- | --- |
 | Menu bar presence | One menu bar item; no Dock icon (`LSUIElement`) or main window on launch by default |
 | Default icon | A monochrome open-arc meter icon, suitable for light and dark appearances |
-| Selected service usage | Select a service, account, and quota window; show a short service label and percentage without an icon |
+| Selected service usage | Select a service, account, and quota window; show the service icon and percentage |
 | Usage panel | A compact list with simultaneous 5h and Weekly columns; services with separate quota groups show one subrow per group |
 | Display selection | Select which LLMs appear in the list and configure their order |
 | Multiple quota windows | Keep short-term, weekly, and model-pool allowances separate |
@@ -50,15 +50,15 @@ Initially, monitor one currently signed-in account per service. Keep account ide
 
 **Default icon:** A fixed open-arc meter with a needle acts as the application entry point. It does not represent aggregate usage across services.
 
-**Service usage:** Bind a selection to `providerID + accountID + metricID`. Display only a short service label and the selected window's percentage, such as `CX 42%`. Each adapter declares a short label of at most three characters (for example, `CX` for Codex, `CC` for Claude Code, `AG` for Antigravity). Used is the default numeric display; selecting remaining changes the label to `CX 58% left`.
+**Service usage:** Bind a selection to `providerID + accountID + metricID`. Display the selected service's monochrome icon followed by its percentage. The icon identifies the provider and does not encode usage. Used is the default numeric display; selecting remaining adds “left” to the percentage. Full provider names remain in tooltips and accessibility descriptions.
 
-- Include a number so users can read usage without clicking. Omit the icon in this mode to reduce menu bar width.
+- Include a number so users can read usage without clicking. Replace textual provider abbreviations with one compact service icon.
 - Initially select the adapter's declared primary window. Settings allows an explicit weekly or other metric selection.
 - Keep the selection stable across refreshes rather than automatically choosing the most-used window.
-- For balance metrics, show a short name and amount, such as `API $12.34`. Keep the same text-only presentation when there is no quota limit.
+- For balance metrics, show a short name and amount, such as `API $12.34`. Keep the provider icon beside the value when there is no quota limit.
 - If the source only provides percentages, show remaining as a percentage without inferring token or request counts.
-- If the target disappears, has no data, or no longer exposes the selected window, show `CX —`, explain why, and offer reselection. Do not silently bind another account.
-- Mark retained readings as stale, for example `CX 42%·`. Tooltips and the panel show the reading time and current error. After hard expiration, the menu bar shows `—`; the panel retains the historical reading.
+- If the target disappears, has no data, or no longer exposes the selected window, show the service icon with `—`, explain why, and offer reselection. Do not silently bind another account.
+- Mark retained readings as stale, for example the service icon with `42%·`. Tooltips and the panel show the reading time and current error. After hard expiration, the menu bar shows `—`; the panel retains the historical reading.
 - Allow numeric overages such as `105%`; cap remaining allowance at zero.
 
 Keep one menu bar item. Multiple simultaneous services, stacked window labels, and rotating selections are outside the initial release.
@@ -212,13 +212,14 @@ Numeric fields are optional: `nil` means unknown; zero means a confirmed zero. R
 
 ## 7. Provider Integration Strategy
 
-Initial support targets are **Codex, Claude Code, and Antigravity**. All three are included in initial implementation and acceptance scope. Validate access methods during integration; add other providers later.
+Initial support targets are **Codex, Claude Code, Antigravity, and GitHub Copilot**. All four are included in initial implementation and acceptance scope. Validate access methods during integration; add other providers later.
 
 | Provider | Candidate access method | Required validation |
 | --- | --- | --- |
 | Codex | Read an authorized local sign-in source and query its quota source | File/Keychain differences, account identity, quota windows, token expiration, and endpoint availability |
 | Claude Code | Use the local tool's usage command; candidate: `claude -p /usage` | Installed version support, quota-only behavior, exit codes, output format, language, dates, and time zones |
 | Antigravity | Read the running client's local status and quota summary RPCs; optional existing OAuth JSON fallback | Account identity, current-user process and loopback listener discovery, model/shared-pool scope, reset periods, weekly availability, and refresh limits |
+| GitHub Copilot | Existing editor/CLI sign-in, then read the github.com account identity and quota endpoint | Monthly billing units, unlimited versus unknown quotas, identity checks, accessible Keychain credentials, and old-settings migration |
 | Future providers | Prefer explicit usage/balance APIs or the tool's own query interface | Authentication, accounting scope, rate limits, and minimum permissions; an inference API key does not imply subscription quota access |
 
 The candidate Codex path `/wham/usage` is an internal client endpoint, not a stable public API contract. Validate Claude's behavior against the installed official tool. In particular, confirm that `claude -p /usage` is handled locally as a slash command: if a CLI version does not recognize it in print mode, the text may be sent to the model as a prompt and consume the very quota being measured. The adapter must check the CLI version against a validated range and must never fall back to an inference request. Record source versions and redacted response fixtures. If validation fails, show “Unsupported source” rather than guessing how to parse it.
@@ -235,7 +236,7 @@ Resolve CLI executable paths from validated sources or Settings rather than rely
 
 1. Load configuration and the latest successful snapshots on launch, then create the menu bar item immediately.
 2. Discover configured sources and confirm account identity. Until confirmation, disk snapshots are labeled as readings from the previous account, not valid current-account readings.
-3. Refresh enabled sources that are visible or selected in the menu bar asynchronously. Allow one in-flight fetch per source, with a suggested overall concurrency limit of three.
+3. Refresh enabled sources that are visible or selected in the menu bar asynchronously. Allow one in-flight fetch per source, with a overall concurrency limit of four.
 4. Before publishing a successful result, check connection configuration version, account identity, and request sequence. Then save the snapshot and update the menu bar and panel.
 5. On failure, retain the last successful data and timestamp, update the error state, and schedule according to error category.
 
@@ -280,7 +281,7 @@ Initially distribute a signed and notarized `.app` directly. Do not base the fir
 
 ### Stage 1: Native Shell and Mock Data
 
-Create the macOS project, menu bar entry, fixed icon, mock 5h/Weekly list, Settings window, and text-only usage mode. Validate toggling, keyboard interaction, light/dark appearance, display scaling, and constrained menu bar space. Clearly label mock data and keep it separate from real services.
+Create the macOS project, menu bar entry, fixed icon, mock 5h/Weekly list, Settings window, and service-icon usage mode. Validate toggling, keyboard interaction, light/dark appearance, display scaling, and constrained menu bar space. Clearly label mock data and keep it separate from real services.
 
 ### Stage 2: First Real Source
 
@@ -288,7 +289,7 @@ Validate Codex access paths, identity, and quota queries, then implement its ada
 
 ### Stage 3: Remaining Initial Sources and Failure States
 
-Validate Claude Code's usage command and Antigravity's usage source, then implement separate adapters. Complete multiple-window handling, model/shared-pool metrics, account-change handling, partial responses, rate limiting, and stale-data display. Map Antigravity periods according to actual source semantics rather than relabeling other periods as 5h or Weekly. Limit implementation to usage queries and presentation.
+Validate Claude Code's usage command, Antigravity's usage source, and GitHub Copilot's monthly quota response, then implement separate adapters. Complete multiple-window handling, model/shared-pool metrics, account-change handling, partial responses, rate limiting, and stale-data display. Map periods according to actual source semantics rather than relabeling monthly or other periods as 5h or Weekly. Limit implementation to usage queries and presentation.
 
 ### Stage 4: Packaging
 
@@ -296,10 +297,10 @@ On Apple Silicon Macs, validate launch at login, single-instance behavior, exit 
 
 **Acceptance criteria:**
 
-- Codex, Claude Code, and Antigravity pass real-source integration validation and can be selected for the list and menu bar metrics.
+- Codex, Claude Code, Antigravity, and GitHub Copilot pass real-source integration validation and can be selected for the list and menu bar metrics.
 - Launch creates one menu bar item; initial network waits do not block its appearance or panel interaction.
 - Default mode uses the open-arc meter icon. Usage mode fixes an account and metric and correctly displays used or remaining values.
-- The panel includes only selected LLMs, with simultaneous 5h and Weekly columns; unknown and unsupported periods show `—`.
+- The panel includes only selected LLMs, with simultaneous 5h and Weekly columns; unknown and unsupported periods show `—`. Copilot's source-reported monthly quotas have explicitly labeled monthly rows.
 - Display selection and order survive restart. Hidden services can remain menu bar targets; sources neither displayed nor selected receive no scheduled refresh.
 - The menu bar and panel share snapshots and update together after refresh.
 - Offline, expired, rate-limited, signed-out, and parsing-failure states are distinguishable without losing the last successful reading.
@@ -312,6 +313,6 @@ Use redacted fixtures and a fixed clock for tests. Cover percentages, absolute a
 
 ## 11. Decisions Requiring Validation
 
-Proceed with these baselines: Apple Silicon (arm64) only, provisional macOS 13 minimum, native Swift application, initial Codex/Claude Code/Antigravity integrations, one current account per service, and one menu bar usage target.
+Proceed with these baselines: Apple Silicon (arm64) only, provisional macOS 13 minimum, native Swift application, initial Codex/Claude Code/Antigravity/GitHub Copilot integrations, one current account per service, and one menu bar usage target.
 
 Validate local credential storage formats, CLI versions and behavior, source permissions and refresh limits, and external source access after signing. Decide future provider priorities, independent sign-in, multiple-account support, and balance APIs after initial integration validation.

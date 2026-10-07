@@ -1,13 +1,14 @@
 import Foundation
 
 public enum ProviderID: String, Codable, CaseIterable, Identifiable, Sendable {
-  case codex, claude, antigravity
+  case codex, claude, antigravity, copilot
   public var id: String { rawValue }
   public var name: String {
     switch self {
     case .codex: "Codex"
     case .claude: "Claude Code"
     case .antigravity: "Antigravity"
+    case .copilot: "GitHub Copilot"
     }
   }
   public var abbreviation: String {
@@ -15,13 +16,14 @@ public enum ProviderID: String, Codable, CaseIterable, Identifiable, Sendable {
     case .codex: "CX"
     case .claude: "CC"
     case .antigravity: "AG"
+    case .copilot: "CP"
     }
   }
   public var minimumInterval: TimeInterval { self == .claude ? 300 : 60 }
   public var manualInterval: TimeInterval { self == .claude ? 30 : 15 }
 }
 
-public enum MetricPeriod: String, Codable, Sendable { case fiveHours, weekly, other }
+public enum MetricPeriod: String, Codable, Sendable { case fiveHours, weekly, monthly, other }
 
 public struct UsageMetric: Codable, Identifiable, Equatable, Sendable {
   public var id: String
@@ -32,8 +34,13 @@ public struct UsageMetric: Codable, Identifiable, Equatable, Sendable {
   public var resetAt: Date?
   public var readAt: Date
   public var pendingConfirmation: Bool = false
+  public var unlimited: Bool = false
+  public var unit: String?
+  public var limit: Double?
+  public var remaining: Double?
   private enum CodingKeys: String, CodingKey {
-    case id, name, period, scope, usedPercent, resetAt, readAt, pendingConfirmation
+    case id, name, period, scope, usedPercent, resetAt, readAt, pendingConfirmation, unlimited,
+      unit, limit, remaining
   }
   public init(from decoder: any Decoder) throws {
     let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -46,10 +53,15 @@ public struct UsageMetric: Codable, Identifiable, Equatable, Sendable {
     readAt = try values.decode(Date.self, forKey: .readAt)
     pendingConfirmation =
       try values.decodeIfPresent(Bool.self, forKey: .pendingConfirmation) ?? false
+    unlimited = try values.decodeIfPresent(Bool.self, forKey: .unlimited) ?? false
+    unit = try values.decodeIfPresent(String.self, forKey: .unit)
+    limit = try values.decodeIfPresent(Double.self, forKey: .limit)
+    remaining = try values.decodeIfPresent(Double.self, forKey: .remaining)
   }
   public init(
     id: String, name: String, period: MetricPeriod = .other, scope: String? = nil,
-    usedPercent: Double?, resetAt: Date? = nil, readAt: Date
+    usedPercent: Double?, resetAt: Date? = nil, readAt: Date,
+    unlimited: Bool = false, unit: String? = nil, limit: Double? = nil, remaining: Double? = nil
   ) {
     self.id = id
     self.name = name
@@ -58,9 +70,13 @@ public struct UsageMetric: Codable, Identifiable, Equatable, Sendable {
     self.usedPercent = usedPercent
     self.resetAt = resetAt
     self.readAt = readAt
+    self.unlimited = unlimited
+    self.unit = unit
+    self.limit = limit
+    self.remaining = remaining
   }
   public func percent(remaining: Bool) -> Double? {
-    guard let usedPercent, usedPercent.isFinite, usedPercent >= 0 else { return nil }
+    guard !unlimited, let usedPercent, usedPercent.isFinite, usedPercent >= 0 else { return nil }
     return remaining ? max(0, 100 - usedPercent) : usedPercent
   }
   public func awaitingReset(at now: Date) -> Bool { resetAt.map { $0 <= now } ?? false }
@@ -179,9 +195,11 @@ public struct ServiceState: Sendable {
   public func label(_ metric: UsageMetric?, now: Date, interval: TimeInterval, remaining: Bool)
     -> String
   {
-    guard let metric, let value = metric.percent(remaining: remaining) else { return "—" }
+    guard let metric else { return "—" }
     let status = freshness(metric, now: now, interval: interval)
     if status == .expired || status == .awaitingReset { return "—" }
+    if metric.unlimited { return status == .stale ? "Unlimited·" : "Unlimited" }
+    guard let value = metric.percent(remaining: remaining) else { return "—" }
     return String(format: "%.0f%%%@", value, status == .stale ? "·" : "")
   }
 }

@@ -197,11 +197,23 @@ final class AppStore: ObservableObject {
     states[.antigravity]?.snapshot?.metrics.filter { $0.scope?.hasPrefix("pool:") != true } ?? []
   }
   func modelLabel(_ metric: UsageMetric) -> String {
-    guard settings.services.first(where: { $0.provider == .antigravity })?.enabled == true else {
+    metricLabel(.antigravity, metric: metric)
+  }
+  func metricLabel(_ id: ProviderID, metric: UsageMetric) -> String {
+    guard settings.services.first(where: { $0.provider == id })?.enabled == true else {
       return "—"
     }
-    return states[.antigravity]?.label(
-      metric, now: now, interval: interval(.antigravity), remaining: settings.showRemaining) ?? "—"
+    return states[id]?.label(
+      metric, now: now, interval: interval(id), remaining: settings.showRemaining) ?? "—"
+  }
+  var copilotMetrics: [UsageMetric] { states[.copilot]?.snapshot?.metrics ?? [] }
+  func countLabel(_ metric: UsageMetric) -> String {
+    guard !metric.unlimited, let limit = metric.limit, let remaining = metric.remaining,
+      let unit = metric.unit
+    else { return "Monthly allowance" }
+    let amount = settings.showRemaining ? remaining : max(0, limit - remaining)
+    return
+      "\(amount.formatted(.number.precision(.fractionLength(0...1)))) / \(limit.formatted(.number.precision(.fractionLength(0...1)))) \(unit)"
   }
   func updateLabel(_ id: ProviderID) -> String {
     guard settings.services.first(where: { $0.provider == id })?.enabled == true else {
@@ -220,7 +232,7 @@ final class AppStore: ObservableObject {
     else { return nil }
     return snapshot.metrics.first { $0.id == settings.selectedMetricID }
   }
-  var menuBarLabel: String {
+  var menuBarValue: String {
     guard settings.showUsage else { return "" }
     let id = settings.selectedProvider
     let enabled = settings.services.first { $0.provider == id }?.enabled == true
@@ -229,7 +241,11 @@ final class AppStore: ObservableObject {
       ? states[id]?.label(
         selectedMetric, now: now, interval: interval(id),
         remaining: settings.showRemaining) ?? "—" : "—"
-    return "\(id.abbreviation) \(label)\(settings.showRemaining && label != "—" ? " left" : "")"
+    return
+      "\(label)\(settings.showRemaining && label != "—" && selectedMetric?.unlimited != true ? " left" : "")"
+  }
+  var menuBarLabel: String {
+    settings.showUsage ? "\(settings.selectedProvider.name) \(menuBarValue)" : "LLM Meter"
   }
   func tooltip(_ id: ProviderID) -> String {
     guard let state = states[id] else { return "Not read yet" }
@@ -248,7 +264,11 @@ final class AppStore: ObservableObject {
         let value =
           metric.percent(remaining: settings.showRemaining).map { String(format: "%.1f%%", $0) }
           ?? "Unknown"
-        lines.append("\(metric.name): \(value) \(settings.showRemaining ? "remaining" : "used")")
+        lines.append(
+          metric.unlimited
+            ? "\(metric.name): Unlimited"
+            : "\(metric.name): \(value) \(settings.showRemaining ? "remaining" : "used")")
+        if metric.unit != nil { lines.append(countLabel(metric)) }
         if let reset = metric.resetAt {
           lines.append(
             reset <= now

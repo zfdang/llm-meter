@@ -15,7 +15,13 @@ public struct LocalStorage: Sendable {
     self.directory = directory
   }
   public func loadSettings() throws -> AppSettings {
-    let settings: AppSettings = try read("settings.json") ?? AppSettings()
+    var settings: AppSettings = try read("settings.json") ?? AppSettings()
+    // Upgrade the original three-provider settings without changing their order or preferences.
+    if settings.schemaVersion == 1, settings.services.count == 3,
+      Set(settings.services.map(\.provider)) == Set([ProviderID.codex, .claude, .antigravity])
+    {
+      settings.services.append(.init(provider: .copilot))
+    }
     try settings.validate()
     return settings
   }

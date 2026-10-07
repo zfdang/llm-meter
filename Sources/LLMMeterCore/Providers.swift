@@ -21,6 +21,7 @@ public struct ProviderRegistry: UsageProvider {
     case .antigravity:
       try await AntigravityProvider(network: network, commands: commands).fetch(
         configuration: configuration)
+    case .copilot: try await CopilotProvider(network: network).fetch(configuration: configuration)
     }
   }
 }

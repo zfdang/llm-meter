@@ -25,9 +25,10 @@ final class MenuBarController: NSObject {
     render()
   }
   func render() {
-    item.button?.image = store.settings.showUsage ? nil : Self.icon()
-    item.button?.imagePosition = store.settings.showUsage ? .noImage : .imageOnly
-    item.button?.title = store.menuBarLabel
+    item.button?.image =
+      store.settings.showUsage ? ProviderIcon.image(store.settings.selectedProvider) : Self.icon()
+    item.button?.imagePosition = store.settings.showUsage ? .imageLeading : .imageOnly
+    item.button?.title = store.settings.showUsage ? " " + store.menuBarValue : ""
     item.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
     item.button?.toolTip =
       store.settings.showUsage

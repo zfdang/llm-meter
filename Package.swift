@@ -10,7 +10,8 @@ let package = Package(
   ],
   targets: [
     .target(name: "LLMMeterCore"),
-    .executableTarget(name: "LLMMeterApp", dependencies: ["LLMMeterCore"]),
+    .executableTarget(
+      name: "LLMMeterApp", dependencies: ["LLMMeterCore"], resources: [.copy("Resources")]),
     .testTarget(name: "LLMMeterCoreTests", dependencies: ["LLMMeterCore"]),
   ]
 )

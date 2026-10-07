@@ -90,6 +90,18 @@ A reset timestamp does not establish a window duration. Quota summary buckets ex
 
 The local path was verified against the installed running client during development. The client must remain open; changes to its private RPC schema or process layout can require adapter updates. Automatic monitoring supports executable paths without whitespace and numeric loopback listeners; custom OAuth JSON is the fallback for unsupported client layouts.
 
+### GitHub Copilot
+
+Supports github.com accounts. Discover editor credentials in `$XDG_CONFIG_HOME/github-copilot/apps.json` or `hosts.json` (default `~/.config`), followed by `$COPILOT_HOME/config.json` (default `~/.copilot`). Parse CLI JSONC without altering quoted tokens. CLI tokens may be in the config or in the existing `copilot-cli` Keychain entry. Keychain queries use a noninteractive authentication context: unavailable access shows setup guidance rather than a repeated authorization prompt. An explicit single-account JSON containing `oauth_token`, optional `user`, and optional github.com `host` is also accepted. Multiple distinct editor accounts require an explicit single-account source; several tokens for the same account are tried in stable order after authentication rejection.
+
+Read `/user` to establish stable GitHub account identity, then GET `/copilot_internal/user` with the existing token. Only github.com's fixed API origin receives credentials; redirects are disabled. Reread the source and reject changes. No OAuth login, token renewal/exchange, inference, or external sign-in modification is performed. The private quota endpoint can change and is not the aggregate organizational usage API.
+
+The Monthly section preserves `quota_snapshots` metrics for premium interactions, chat, and completions. Interpret numeric or string entitlement/remaining amounts; otherwise use explicitly reported percentages. Token-based premium interactions are labeled AI Credits, while legacy units stay requests. Explicit Unlimited is distinct from missing values and zero entitlement. A premium pool reporting unavailable quota is not claimed to be unlimited. Prefer source reset timestamps, including per-quota Unix timestamps and UTC date-only fallbacks. Do not convert credits to money or monthly quotas into 5h/Weekly values. [GitHub's billing documentation](https://docs.github.com/en/copilot/concepts/billing-and-usage/individuals/billing) describes the monthly AI-credit cycle.
+
+Original three-provider settings gain Copilot at the end while preserving existing order, visibility, account binding, and display preferences. Loading does not rewrite the file; later normal saves persist the upgraded configuration. Older metric caches default added amount/unit/unlimited fields safely.
+
+Provider menu bar icons use bundled monochrome assets from LobeHub Icons, with their MIT license and source SVGs included. The application resource bundle is packaged under Contents/Resources; the SwiftPM executable uses its build resource bundle during development.
+
 ## Persistence and Refresh
 
 Store `settings.json` and `usage-cache.json` in `~/Library/Application Support/LLM Meter/`. Files use 0600 permissions and atomic replacement. Credentials and raw responses are excluded. On unreadable or unsupported storage, preserve the original file and prevent automatic replacement. To recover manually, quit the app, move the affected file aside, and relaunch.
@@ -102,7 +114,7 @@ Fresh percentages use green below 50% used, orange from 50% to below 80%, and re
 
 Automatic intervals respect provider minimums. Manual refresh coalesces in-flight requests and respects manual minimums and rate-limit cooldowns. Transient failures retain successful readings. Stale readings use `·`; hard-expired or reset-pending metrics show `—`. Failed automatic refreshes back off, while a user can retry non-rate-limited failures after the manual minimum.
 
-Sleep cancels in-flight work and suspends scheduling. Wake checks due sources once. Generation checks prevent cancelled or outdated source results from changing the current state. At most three initial providers can fetch concurrently.
+Sleep cancels in-flight work and suspends scheduling. Wake checks due sources once. Generation checks prevent cancelled or outdated source results from changing the current state. At most four initial providers can fetch concurrently.
 
 ## Verification
 

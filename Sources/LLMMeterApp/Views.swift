@@ -51,6 +51,8 @@ struct UsagePanel: View {
                 !store.antigravityPools.isEmpty || !store.antigravityModels.isEmpty
               {
                 antigravityRows
+              } else if service.provider == .copilot, !store.copilotMetrics.isEmpty {
+                copilotRows
               } else {
                 serviceRow(service.provider)
               }
@@ -73,6 +75,9 @@ struct UsagePanel: View {
 
   private var contentHeight: CGFloat {
     let rows = store.visibleServices.reduce(0) { total, service in
+      if service.provider == .copilot, !store.copilotMetrics.isEmpty {
+        return total + 32 + store.copilotMetrics.count * 60
+      }
       let count =
         store.antigravityPools.isEmpty
         ? store.antigravityModels.count : store.antigravityPools.count
@@ -133,6 +138,37 @@ struct UsagePanel: View {
         }
       }
     }.help(store.tooltip(.antigravity))
+  }
+
+  private var copilotRows: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      HStack {
+        Text("GitHub Copilot").font(.system(size: 13, weight: .medium))
+        Spacer()
+        Text("Monthly · \(store.updateLabel(.copilot))").font(.system(size: 10)).foregroundStyle(
+          .secondary)
+      }.padding(.top, 10).padding(.bottom, 6)
+      ForEach(store.copilotMetrics) { metric in
+        HStack {
+          VStack(alignment: .leading, spacing: 4) {
+            Text(metric.name).font(.system(size: 11, weight: .medium))
+            if !metric.unlimited {
+              Text(store.countLabel(metric)).font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+          }
+          Spacer()
+          VStack(alignment: .trailing, spacing: 5) {
+            value(store.metricLabel(.copilot, metric: metric), used: metric.usedPercent)
+            if !metric.unlimited {
+              Text(UsageDisplay.resetCountdown(metric.resetAt, now: store.now)).font(
+                .system(size: 10)
+              )
+              .foregroundStyle(.secondary)
+            }
+          }
+        }.padding(.vertical, 10)
+      }
+    }.help(store.tooltip(.copilot))
   }
 
   private func value(_ label: String, used: Double?) -> some View {
@@ -209,7 +245,7 @@ struct SettingsView: View {
           Text("Remaining").tag(true)
         }
         Text(
-          "Service usage shows a short service label and percentage without an icon. Select a metric after its first successful refresh."
+          "Service usage shows the service icon and percentage. Select a metric after its first successful refresh."
         )
         .font(.caption).foregroundStyle(.secondary)
         if let snapshot = store.states[store.settings.selectedProvider]?.snapshot,
@@ -311,6 +347,7 @@ struct SettingsView: View {
     case .codex: "Default: ~/.codex/auth.json"
     case .claude: "Auto-detect claude executable"
     case .antigravity: "Auto-detect running Antigravity (optional OAuth JSON)"
+    case .copilot: "Auto-detect Copilot editor / CLI sign-in"
     }
   }
   private func sourceDescription(_ id: ProviderID) -> String {
@@ -321,6 +358,8 @@ struct SettingsView: View {
       "Requires Claude Code 2.1.285+. Runs its read-only /usage command; no model requests or tools."
     case .antigravity:
       "Leave blank to read the running Antigravity app's local quota status. Keep it open and signed in. Optional fallback: an OAuth JSON with a current access_token. Quota groups and model metrics can be selected in Menu Bar."
+    case .copilot:
+      "Reads github.com Copilot editor sign-in or Copilot CLI config and an already accessible Keychain token. Optional single-account OAuth JSON. Monthly quotas retain AI-credit/request units; no login, token renewal, or inference requests."
     }
   }
   private func choose(_ id: ProviderID) {

@@ -13,6 +13,7 @@ trap 'rm -rf "$icon_directory" "$staging_directory"' EXIT
 mkdir -p "$staged_app/Contents/MacOS" "$staged_app/Contents/Resources"
 cp "$binary_directory/LLMMeter" "$staged_app/Contents/MacOS/LLMMeter"
 cp Resources/Info.plist "$staged_app/Contents/Info.plist"
+cp -R "$binary_directory/LLMMeter_LLMMeterApp.bundle" "$staged_app/Contents/Resources/"
 mkdir -p "$icon_directory/AppIcon.iconset"
 "$binary_directory/LLMMeter" --export-icon "$icon_directory/icon.png"
 for size in 16 32 128 256 512; do
