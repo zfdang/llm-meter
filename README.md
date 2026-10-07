@@ -2,6 +2,10 @@
 
 A native macOS menu bar utility for LLM usage and remaining allowances. Requires Apple Silicon and macOS 13 or later.
 
+<img src="docs/images/usage-panel.png" alt="LLM Meter's provider icon and usage panel" width="420">
+
+*The native interface with fictional example quotas. Each provider's available windows depend on its source.*
+
 Click the meter icon or usage label to see a compact **5h / Weekly** list. Settings controls which services appear, their order, used versus remaining values, and whether the menu bar shows the default icon or one selected service icon followed by its usage percentage.
 
 Each usage window includes a reset countdown. The footer shows the latest successful update among visible enabled services; hover over it for each service's update age. Hover over a row for exact reset and reading times, masked account details, plan, and errors. Unknown reset times stay unknown; a passed reset shows “Awaiting update” until the source confirms a new allowance. Reset credits are not displayed by the current adapters.
@@ -21,6 +25,12 @@ open "build/LLM Meter.app"
 
 `make app` creates an arm64 application with a local ad-hoc signature and a `build/LLM-Meter-arm64.zip` archive that preserves executable permissions. `SIGNING_IDENTITY` can supply a Developer ID identity; notarization is a separate distribution step. For launch at login, place the bundle in a stable location such as `/Applications` before enabling the setting.
 
+## GitHub Builds
+
+[CI](https://github.com/zfdang/llm-meter/actions/workflows/ci.yml) checks Swift formatting and runs the tests on pull requests and pushes to main. [Package macOS app](https://github.com/zfdang/llm-meter/actions/workflows/package.yml) builds and verifies the arm64 app on pull requests, main, and `v*` tags. Both workflows can also be run manually after they land on the default branch.
+
+Download the `LLM-Meter-arm64` artifact from a successful packaging run. It contains the app ZIP and a SHA-256 checksum. These development builds are ad hoc signed and **not notarized**. Public distribution requires Developer ID signing and Apple notarization; the workflow does not publish a GitHub Release automatically.
+
 ## Providers
 
 | Provider | Source | Current support |
@@ -33,6 +43,8 @@ open "build/LLM Meter.app"
 Choose a custom Codex auth file or Claude executable in Settings if automatic discovery does not locate your source. For Antigravity, leave the source path blank (or click **Use default source**), keep the Antigravity app open and signed in, and refresh. The monitor discovers the client's loopback language server and reads status without browser cookies, credential exports, or its own login flow. A custom OAuth JSON remains an optional fallback. No integration copies or rotates refresh tokens. Open the original tool to renew expired credentials.
 
 Copilot supports github.com accounts. It reads existing editor apps.json/hosts.json or CLI config.json (including JSONC), and does not prompt for Keychain access. Select a single-account OAuth JSON file if auto-discovery cannot find accessible credentials. Copilot uses a separate Monthly section; it does not invent 5h/Weekly windows.
+
+Copilot quota reads depend on GitHub's undocumented `/copilot_internal/user` endpoint. GitHub may change or remove it without notice. If access or parsing fails, the app reports the error and retains the last successful reading with its normal stale/expired indicators; the integration may need an update.
 
 Unknown or unsupported periods display `—`. Antigravity's quota groups keep separate 5h/Weekly values; when the client supplies only model quotas, the panel shows each model with an unknown window duration. All metrics are available in tooltips, Settings, and the menu bar metric picker. Claude Code has fixture coverage; its live subscription read still requires a suitable local login source.
 

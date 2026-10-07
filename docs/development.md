@@ -127,6 +127,14 @@ Manual native checks should cover:
 - Light/dark appearance, Retina rendering, VoiceOver text, and narrow menu bar space.
 - Login startup from a stable signed bundle, single instance, sleep/wake, and exit cleanup.
 
-Development validation established a successful live Codex reading. Claude Code was installed but its current authentication did not expose a subscription account, and no Antigravity OAuth JSON was configured; live reads for those sources remain unverified. Fixture tests validate their implemented request and parsing paths.
+Development validation established successful live Codex, local Antigravity, and Copilot readings. Claude Code was installed but its current authentication did not expose a subscription account. Its live read remains unverified; validate `claude -p /usage` with a real subscription login and CLI version 2.1.285 or newer before claiming that integration is fully verified. Fixture tests cover its request and parsing paths.
+
+The subprocess runner attempts `setpgid` after launch, so a child that has already executed may remain outside the intended process group. Cleanup checks ownership with `getpgid` and falls back to terminating only the child. Descendant cleanup is therefore best effort. It currently inherits the environment for CLI compatibility; an explicit environment allowlist is a follow-up hardening task.
+
+## Screenshots and GitHub Workflows
+
+Run `make screenshots` to rebuild `docs/images/usage-panel.png`. The exporter renders the actual SwiftUI panel with deterministic fictional quotas and an isolated temporary store. It does not read personal settings, start the refresh scheduler, or query usage sources. The menu bar sample uses the same provider icon and value as the app.
+
+`ci.yml` runs strict formatting and core tests. `package.yml` builds the arm64 app, verifies architecture and its ad hoc signature, and uploads the ZIP plus SHA-256 checksum for 30 days. Both run on pull requests and main and allow manual dispatch; packaging also runs on `v*` tags. No credential secrets are required, and no release is published. Before public distribution, configure Developer ID signing and notarization, including stapling and Gatekeeper validation.
 
 The minimum deployment target is macOS 13; execution on an actual macOS 13 machine and Developer ID signing/notarization remain release checks. Automatic refresh currently uses a timer; immediate network-recovery notifications are a follow-up improvement.

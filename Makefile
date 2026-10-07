@@ -1,4 +1,4 @@
-.PHONY: build test app run
+.PHONY: build test app run screenshots
 
 build:
 	swift build --arch arm64
@@ -11,3 +11,6 @@ app:
 
 run: app
 	open "build/LLM Meter.app"
+
+screenshots: app
+	"build/LLM Meter.app/Contents/MacOS/LLMMeter" --export-screenshot docs/images/usage-panel.png

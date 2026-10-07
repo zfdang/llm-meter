@@ -38,6 +38,24 @@ final class AppStore: ObservableObject {
     message = errors.isEmpty ? nil : errors.joined(separator: "\n")
     coordinator = RefreshCoordinator(settings: settings, snapshots: snapshots, provider: provider)
   }
+  static func screenshotPreview(
+    storage: LocalStorage, snapshots: [UsageSnapshot], now: Date
+  ) -> AppStore {
+    let store = AppStore(storage: storage)
+    store.now = now
+    store.states = Dictionary(
+      uniqueKeysWithValues: snapshots.map { snapshot in
+        var state = ServiceState(snapshot: snapshot)
+        state.confirmed = true
+        return (snapshot.provider, state)
+      })
+    store.settings.showUsage = true
+    store.settings.selectedMetricID = "fiveHours"
+    store.settings.selectedAccountID = snapshots.first { $0.provider == .codex }?.accountID
+    store.settingsWritable = false
+    store.cacheWritable = false
+    return store
+  }
   func start() {
     guard eventTask == nil else { return }
     let coordinator = coordinator

@@ -151,7 +151,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 let arguments = CommandLine.arguments
-if arguments.contains("--diagnose") {
+if let index = arguments.firstIndex(of: "--export-screenshot"),
+  arguments.indices.contains(index + 1)
+{
+  try ScreenshotExporter.export(to: URL(fileURLWithPath: arguments[index + 1]))
+} else if arguments.contains("--diagnose") {
   Task {
     let provider = ProviderRegistry()
     let settings = (try? LocalStorage().loadSettings()) ?? AppSettings()
