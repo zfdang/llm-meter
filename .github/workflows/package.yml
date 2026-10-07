@@ -63,7 +63,7 @@ jobs:
     name: Publish main release
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: package
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
@@ -72,6 +72,12 @@ jobs:
         with:
           name: LLM-Meter-arm64
           path: build
+      - name: Verify release assets
+        working-directory: build
+        run: |
+          test -s LLM-Meter-arm64.zip
+          test -s LLM-Meter-arm64.zip.sha256
+          shasum -a 256 -c LLM-Meter-arm64.zip.sha256
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -105,3 +111,13 @@ jobs:
               --notes "$notes" \
               build/LLM-Meter-arm64.zip build/LLM-Meter-arm64.zip.sha256
           fi
+      - name: Verify published assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.package.outputs.tag }}
+        run: |
+          gh release view "$TAG" --json assets --jq '
+            [.assets[] | select(.size > 0) | .name] |
+            (index("LLM-Meter-arm64.zip") != null and
+             index("LLM-Meter-arm64.zip.sha256") != null)' | grep -Fxq true
