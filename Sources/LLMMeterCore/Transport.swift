@@ -72,31 +72,94 @@ public protocol CommandRunning: Sendable {
     -> CommandResult
 }
 
-/// Owns a single subprocess. The lock protects cancellation before and during launch.
+/// Owns and reaps one child. Launch, cancellation, and waitpid share the lock so a
+/// child PID cannot be reaped/reused while shutdown is still signaling its group.
 private final class ProcessControl: @unchecked Sendable {
   private let lock = NSLock()
-  private var process: Process?
+  private var pid: pid_t?
+  private var status: Int32?
   private var cancelled = false
-  func launch(_ process: Process) throws {
+
+  func launch(
+    executable: String, arguments: [String], environment: [String: String],
+    directory: String, output: Int32, errors: Int32
+  ) throws {
     lock.lock()
     defer { lock.unlock() }
     if cancelled { throw MeterError.cancelled }
-    self.process = process
-    try process.run()
-    // Only signal a group if the child actually owns it.
-    _ = setpgid(process.processIdentifier, process.processIdentifier)
+    var attributes: posix_spawnattr_t?
+    var actions: posix_spawn_file_actions_t?
+    func check(_ result: Int32) throws {
+      guard result == 0 else {
+        throw MeterError.connection("Cannot start the configured CLI executable.")
+      }
+    }
+    try check(posix_spawnattr_init(&attributes))
+    defer { posix_spawnattr_destroy(&attributes) }
+    try check(posix_spawn_file_actions_init(&actions))
+    defer { posix_spawn_file_actions_destroy(&actions) }
+    // A zero group ID assigns the child's own PID before exec, without a race.
+    try check(posix_spawnattr_setpgroup(&attributes, 0))
+    try check(
+      posix_spawnattr_setflags(
+        &attributes, Int16(POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_CLOEXEC_DEFAULT)))
+    try check(posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0))
+    try check(posix_spawn_file_actions_adddup2(&actions, output, STDOUT_FILENO))
+    try check(posix_spawn_file_actions_adddup2(&actions, errors, STDERR_FILENO))
+    // The _np variant also exists in SDKs for our macOS 13 deployment target.
+    try check(posix_spawn_file_actions_addchdir_np(&actions, directory))
+    var argv = ([executable] + arguments).map { strdup($0) } + [nil]
+    var envp =
+      environment.sorted { $0.key < $1.key }.map { strdup("\($0.key)=\($0.value)") } + [nil]
+    defer {
+      for pointer in argv { free(pointer) }
+      for pointer in envp { free(pointer) }
+    }
+    guard argv.dropLast().allSatisfy({ $0 != nil }), envp.dropLast().allSatisfy({ $0 != nil })
+    else {
+      throw MeterError.connection("Cannot allocate CLI launch arguments.")
+    }
+    var child: pid_t = 0
+    try check(posix_spawn(&child, executable, &actions, &attributes, &argv, &envp))
+    pid = child
   }
+
+  func pollStatus() throws -> Int32? {
+    lock.lock()
+    defer { lock.unlock() }
+    if let status { return status }
+    guard let pid else { return nil }
+    var value: Int32 = 0
+    let result = waitpid(pid, &value, WNOHANG)
+    if result == 0 || (result == -1 && errno == EINTR) { return nil }
+    guard result == pid else {
+      throw MeterError.connection("Cannot wait for the CLI executable.")
+    }
+    status = Self.exitStatus(value)
+    return status
+  }
+
   func stop() {
     lock.lock()
+    defer { lock.unlock() }
     cancelled = true
-    let process = process
-    lock.unlock()
-    guard let process, process.isRunning else { return }
-    let pid = process.processIdentifier
-    let target = getpgid(pid) == pid ? -pid : pid
-    kill(target, SIGTERM)
+    guard let pid, status == nil else { return }
+    // Keep the leader unreaped until escalation, even if it exits on SIGTERM:
+    // grandchildren that ignore SIGTERM still receive the group SIGKILL.
+    kill(-pid, SIGTERM)
+    kill(pid, SIGTERM)
     Thread.sleep(forTimeInterval: 0.15)
-    if process.isRunning { kill(target, SIGKILL) }
+    kill(-pid, SIGKILL)
+    kill(pid, SIGKILL)
+    var value: Int32 = 0
+    var result: pid_t
+    repeat { result = waitpid(pid, &value, 0) } while result == -1 && errno == EINTR
+    if result == pid { status = Self.exitStatus(value) }
+  }
+
+  private static func exitStatus(_ value: Int32) -> Int32 {
+    let signal = value & 0x7f
+    return signal == 0 ? (value >> 8) & 0xff : signal
   }
 }
 
@@ -131,23 +194,19 @@ public struct ProcessRunner: CommandRunning {
           try? output.close()
           try? errors.close()
         }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.currentDirectoryURL = directory
-        process.standardInput = FileHandle.nullDevice
-        process.standardOutput = output
-        process.standardError = errors
         var environment = ProcessInfo.processInfo.environment
         environment.removeValue(forKey: "CLAUDECODE")
         environment["NO_COLOR"] = "1"
         environment["PATH"] = Self.searchPaths.joined(separator: ":")
-        process.environment = environment
-        do { try control.launch(process) } catch let error as MeterError { throw error } catch {
-          throw MeterError.connection("Cannot start the configured CLI executable.")
-        }
+        try control.launch(
+          executable: executable, arguments: arguments, environment: environment,
+          directory: directory.path, output: output.fileDescriptor, errors: errors.fileDescriptor)
+        defer { control.stop() }
         let deadline = Date().addingTimeInterval(timeout)
-        while process.isRunning {
+        var status: Int32?
+        while status == nil {
+          status = try control.pollStatus()
+          if status != nil { break }
           if Date() >= deadline {
             control.stop()
             throw MeterError.timeout
@@ -161,7 +220,6 @@ public struct ProcessRunner: CommandRunning {
           }
           try await Task.sleep(for: .milliseconds(20))
         }
-        process.waitUntilExit()
         for url in [outputURL, errorURL] {
           let size =
             (try manager.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
@@ -170,7 +228,7 @@ public struct ProcessRunner: CommandRunning {
           }
         }
         return CommandResult(
-          output: try Data(contentsOf: outputURL), status: process.terminationStatus)
+          output: try Data(contentsOf: outputURL), status: status ?? -1)
       }
       let result = try await worker.value
       try Task.checkCancellation()

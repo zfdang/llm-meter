@@ -44,9 +44,12 @@ final class MenuBarController: NSObject {
       ? store.tooltip(store.settings.selectedProvider) : "LLM Meter · Click to view usage"
     item.button?.setAccessibilityLabel(store.settings.showUsage ? store.menuBarLabel : "LLM Meter")
   }
-  static func icon(size: CGFloat = 18, color: NSColor = .black) -> NSImage {
+  static func icon(size: CGFloat = 18, color: NSColor? = nil) -> NSImage {
+    // Black is the template's opaque mask; AppKit supplies the menu bar tint.
+    // Icon export uses an explicit color and disables template rendering.
+    let ink = color ?? .black
     let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
-      color.setStroke()
+      ink.setStroke()
       let center = NSPoint(x: size * 0.5, y: size * 0.43)
       let arc = NSBezierPath()
       arc.appendArc(
@@ -61,7 +64,7 @@ final class MenuBarController: NSObject {
       needle.lineWidth = size * 0.09
       needle.lineCapStyle = .round
       needle.stroke()
-      color.setFill()
+      ink.setFill()
       NSBezierPath(
         ovalIn: NSRect(x: size * 0.425, y: size * 0.355, width: size * 0.15, height: size * 0.15)
       ).fill()
@@ -154,7 +157,8 @@ let arguments = CommandLine.arguments
 if let index = arguments.firstIndex(of: "--export-screenshot"),
   arguments.indices.contains(index + 1)
 {
-  try ScreenshotExporter.export(to: URL(fileURLWithPath: arguments[index + 1]))
+  try ScreenshotExporter.export(
+    to: URL(fileURLWithPath: arguments[index + 1]), dark: arguments.contains("--dark"))
 } else if arguments.contains("--diagnose") {
   Task {
     let provider = ProviderRegistry()

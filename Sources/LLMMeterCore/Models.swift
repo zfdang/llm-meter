@@ -177,6 +177,10 @@ public enum MeterError: Error, LocalizedError, Equatable, Sendable {
 public enum Freshness: Sendable { case fresh, stale, expired, awaitingReset }
 
 public struct ServiceState: Sendable {
+  private static let expiryIntervalMultiplier: TimeInterval = 4
+  private static let minimumExpiryAge: TimeInterval = 1800
+  private static let staleIntervalMultiplier: TimeInterval = 2
+  private static let minimumStaleAge: TimeInterval = 600
   public var snapshot: UsageSnapshot?
   public var error: MeterError?
   public var refreshing = false
@@ -186,8 +190,12 @@ public struct ServiceState: Sendable {
   public func freshness(_ metric: UsageMetric, now: Date, interval: TimeInterval) -> Freshness {
     if metric.awaitingReset(at: now) { return .awaitingReset }
     let age = now.timeIntervalSince(metric.readAt)
-    if age >= max(4 * interval, 1800) { return .expired }
-    if !confirmed || metric.pendingConfirmation || error != nil || age >= max(2 * interval, 600) {
+    if age >= max(Self.expiryIntervalMultiplier * interval, Self.minimumExpiryAge) {
+      return .expired
+    }
+    if !confirmed || metric.pendingConfirmation || error != nil
+      || age >= max(Self.staleIntervalMultiplier * interval, Self.minimumStaleAge)
+    {
       return .stale
     }
     return .fresh

@@ -3,6 +3,7 @@
 A native macOS menu bar utility for LLM usage and remaining allowances. Requires Apple Silicon and macOS 13 or later.
 
 <img src="docs/images/usage-panel.png" alt="LLM Meter's provider icon and usage panel" width="420">
+<img src="docs/images/usage-panel-dark.png" alt="LLM Meter usage panel in dark mode" width="420">
 
 *The native interface with fictional example quotas. Each provider's available windows depend on its source.*
 

@@ -104,7 +104,7 @@ Provider menu bar icons use bundled monochrome assets from LobeHub Icons, with t
 
 ## Persistence and Refresh
 
-Store `settings.json` and `usage-cache.json` in `~/Library/Application Support/LLM Meter/`. Files use 0600 permissions and atomic replacement. Credentials and raw responses are excluded. On unreadable or unsupported storage, preserve the original file and prevent automatic replacement. To recover manually, quit the app, move the affected file aside, and relaunch.
+Store `settings.json` and `usage-cache.json` in `~/Library/Application Support/LLM Meter/`. Files use 0600 permissions and atomic replacement. Credentials and raw responses are excluded. Snapshot changes are tracked as dirty, then written once when the refresh batch becomes idle; unchanged error/status events do not rewrite the cache. App shutdown flushes pending snapshot changes. On unreadable or unsupported storage, preserve the original file and prevent automatic replacement. To recover manually, quit the app, move the affected file aside, and relaunch.
 
 The menu bar and panel share one snapshot store. The panel places reset countdowns beneath the simultaneous 5h/Weekly values and a single update-age label in the footer. That label uses the most recent successful read among visible enabled services; its tooltip lists each service’s individual update status. Tooltips retain exact local reset/reading times and details for all metrics. Countdown calculations use the source-reported absolute timestamp and never renew usage locally. Current adapters do not supply reset-credit counts. Cached accounts remain unconfirmed until a successful fetch. A menu bar selection binds a stable account ID; when the signed-in account changes, users must select a metric again to bind the new account.
 
@@ -129,11 +129,11 @@ Manual native checks should cover:
 
 Development validation established successful live Codex, local Antigravity, and Copilot readings. Claude Code was installed but its current authentication did not expose a subscription account. Its live read remains unverified; validate `claude -p /usage` with a real subscription login and CLI version 2.1.285 or newer before claiming that integration is fully verified. Fixture tests cover its request and parsing paths.
 
-The subprocess runner attempts `setpgid` after launch, so a child that has already executed may remain outside the intended process group. Cleanup checks ownership with `getpgid` and falls back to terminating only the child. Descendant cleanup is therefore best effort. It currently inherits the environment for CLI compatibility; an explicit environment allowlist is a follow-up hardening task.
+The subprocess runner uses `posix_spawn` with `POSIX_SPAWN_SETPGROUP` to assign an independent process group before execution. File actions provide null stdin, private output files, and an isolated working directory; other file descriptors are closed by default. Cancellation and timeout signal the group with TERM and then KILL, retaining the unreaped leader until escalation and reaping it with `waitpid`. Descendants that deliberately leave the process group are outside this cleanup guarantee. It currently inherits the environment for CLI compatibility; an explicit environment allowlist is a follow-up hardening task.
 
 ## Screenshots and GitHub Workflows
 
-Run `make screenshots` to rebuild `docs/images/usage-panel.png`. The exporter renders the actual SwiftUI panel with deterministic fictional quotas and an isolated temporary store. It does not read personal settings, start the refresh scheduler, or query usage sources. The menu bar sample uses the same provider icon and value as the app.
+Run `make screenshots` to rebuild the light and dark previews in `docs/images/`. Use `--export-screenshot <path> --dark` for an individual dark preview. The exporter renders the actual SwiftUI panel with deterministic fictional quotas and an isolated temporary store. It does not read personal settings, start the refresh scheduler, or query usage sources. The menu bar sample uses the same provider icon and value as the app.
 
 `ci.yml` runs strict formatting and core tests. `package.yml` builds the arm64 app, verifies architecture and its ad hoc signature, and uploads the ZIP plus SHA-256 checksum for 30 days. Both run on pull requests and main and allow manual dispatch; packaging also runs on `v*` tags. No credential secrets are required, and no release is published. Before public distribution, configure Developer ID signing and notarization, including stapling and Gatekeeper validation.
 

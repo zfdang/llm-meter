@@ -67,6 +67,33 @@ private actor CopilotFallbackTransport: HTTPTransport {
   #expect(try Data(contentsOf: source) == data)
 }
 
+private actor CopilotFailingTransport: HTTPTransport {
+  let failure: MeterError
+  private(set) var reads = 0
+  init(_ failure: MeterError) { self.failure = failure }
+  func data(for request: URLRequest) async throws -> Data {
+    reads += 1
+    throw failure
+  }
+}
+
+@Test(arguments: [MeterError.rateLimited(60), .network, .malformed("Fixture reply")])
+func copilotDoesNotRotateTokensForNonAuthenticationFailures(failure: MeterError) async throws {
+  let source = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+  defer { try? FileManager.default.removeItem(at: source) }
+  try Data(
+    #"{"github.com:a":{"user":"octocat","oauth_token":"first"},"github.com:b":{"user":"octocat","oauth_token":"second"}}"#
+      .utf8
+  ).write(to: source)
+  let network = CopilotFailingTransport(failure)
+  do {
+    _ = try await CopilotProvider(network: network).fetch(
+      configuration: .init(provider: .copilot, sourcePath: source.path))
+    Issue.record("A failed refresh unexpectedly succeeded")
+  } catch { #expect(error as? MeterError == failure) }
+  #expect(await network.reads == 1)
+}
+
 @Test func copilotJSONCPreservesQuotedContentAndRejectsUnclosedComments() throws {
   let data = Data(
     #"{/* comment */ "oauth_token":"x//y/*z*/,}", "array":[1,2,], // line comment"#.appending("\n}")

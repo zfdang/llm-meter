@@ -16,6 +16,8 @@ public enum UsageDisplay {
   }
 
   private static func duration(_ seconds: TimeInterval) -> String {
+    // Keep extreme source timestamps compact instead of rendering huge day counts.
+    if seconds >= 1000 * 86400 { return "999d+" }
     let minutes = Int(min(seconds / 60, Double(Int.max / 2)))
     let days = minutes / 1440
     let hours = (minutes % 1440) / 60

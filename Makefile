@@ -14,3 +14,4 @@ run: app
 
 screenshots: app
 	"build/LLM Meter.app/Contents/MacOS/LLMMeter" --export-screenshot docs/images/usage-panel.png
+	"build/LLM Meter.app/Contents/MacOS/LLMMeter" --export-screenshot docs/images/usage-panel-dark.png --dark
