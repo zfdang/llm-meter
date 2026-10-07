@@ -48,7 +48,7 @@ public struct LocalStorage: Sendable {
     let url = directory.appendingPathComponent(name)
     guard FileManager.default.fileExists(atPath: url.path) else { return nil }
     do { return try JSONDecoder().decode(T.self, from: Data(contentsOf: url)) } catch {
-      throw MeterError.storage("Cannot read \(name). Original file preserved.")
+      throw MeterError.storage(L10n.format("Cannot read %@. Original file preserved.", name))
     }
   }
   private func write<T: Encodable>(_ value: T, name: String) throws {
@@ -73,6 +73,8 @@ public struct LocalStorage: Sendable {
       guard rename(temporary.path, destination.path) == 0 else {
         throw MeterError.storage("Could not replace a storage file.")
       }
-    } catch { throw MeterError.storage("Could not save \(name). Check folder permissions.") }
+    } catch {
+      throw MeterError.storage(L10n.format("Could not save %@. Check folder permissions.", name))
+    }
   }
 }

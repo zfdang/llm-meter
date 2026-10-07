@@ -41,7 +41,8 @@ final class MenuBarController: NSObject {
     item.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
     item.button?.toolTip =
       store.settings.showUsage
-      ? store.tooltip(store.settings.selectedProvider) : "LLM Meter · Click to view usage"
+      ? store.tooltip(store.settings.selectedProvider)
+      : L10n.text("LLM Meter · Click to view usage")
     item.button?.setAccessibilityLabel(store.settings.showUsage ? store.menuBarLabel : "LLM Meter")
   }
   static func icon(size: CGFloat = 18, color: NSColor? = nil) -> NSImage {
@@ -88,7 +89,7 @@ final class MenuBarController: NSObject {
     if window == nil {
       let controller = NSHostingController(rootView: SettingsView(store: store))
       let window = NSWindow(contentViewController: controller)
-      window.title = "LLM Meter Settings"
+      window.title = L10n.text("LLM Meter Settings")
       window.styleMask = [.titled, .closable, .miniaturizable]
       window.isReleasedWhenClosed = false
       window.center()
@@ -119,18 +120,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let appItem = NSMenuItem()
     let appMenu = NSMenu()
     let settingsItem = appMenu.addItem(
-      withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+      withTitle: L10n.text("Settings…"), action: #selector(openSettings), keyEquivalent: ",")
     settingsItem.target = self
     appMenu.addItem(.separator())
     appMenu.addItem(
-      withTitle: "Quit LLM Meter", action: #selector(NSApplication.terminate(_:)),
+      withTitle: L10n.text("Quit LLM Meter"), action: #selector(NSApplication.terminate(_:)),
       keyEquivalent: "q")
     appItem.submenu = appMenu
     menu.addItem(appItem)
     let windowItem = NSMenuItem()
-    let windowMenu = NSMenu(title: "Window")
+    let windowMenu = NSMenu(title: L10n.text("Window"))
     windowMenu.addItem(
-      withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+      withTitle: L10n.text("Close"), action: #selector(NSWindow.performClose(_:)),
+      keyEquivalent: "w")
     windowItem.submenu = windowMenu
     menu.addItem(windowItem)
     NSApplication.shared.mainMenu = menu
