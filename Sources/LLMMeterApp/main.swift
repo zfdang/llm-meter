@@ -41,7 +41,8 @@ final class MenuBarController: NSObject {
     item.button?.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
     item.button?.toolTip =
       store.settings.showUsage
-      ? store.tooltip(store.settings.selectedProvider) : "LLM Meter · Click to view usage"
+      ? store.tooltip(store.settings.selectedProvider)
+      : L10n.text("LLM Meter · Click to view usage")
     item.button?.setAccessibilityLabel(store.settings.showUsage ? store.menuBarLabel : "LLM Meter")
   }
   static func icon(size: CGFloat = 18, color: NSColor? = nil) -> NSImage {
@@ -50,23 +51,37 @@ final class MenuBarController: NSObject {
     let ink = color ?? .black
     let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { _ in
       ink.setStroke()
-      let center = NSPoint(x: size * 0.5, y: size * 0.43)
-      let arc = NSBezierPath()
-      arc.appendArc(
-        withCenter: center, radius: size * 0.37, startAngle: 210,
-        endAngle: -30, clockwise: true)
-      arc.lineWidth = size * 0.09
-      arc.lineCapStyle = .round
-      arc.stroke()
-      let needle = NSBezierPath()
-      needle.move(to: center)
-      needle.line(to: NSPoint(x: size * 0.69, y: size * 0.64))
-      needle.lineWidth = size * 0.09
-      needle.lineCapStyle = .round
-      needle.stroke()
+      let center = NSPoint(x: size * 0.5, y: size * 0.5)
+      // A complete circular silhouette fills the same 18-point slot as provider
+      // marks. Insets include the stroke, avoiding clipping at Retina scales.
+      let ring = NSBezierPath(
+        ovalIn: NSRect(
+          x: size * 0.08, y: size * 0.08, width: size * 0.84, height: size * 0.84))
+      ring.lineWidth = size * 0.09
+      ring.stroke()
+      let details = NSBezierPath()
+      for angle in [30.0, 90.0, 150.0] {
+        let radians = angle * .pi / 180
+        details.move(
+          to: NSPoint(
+            x: center.x + size * 0.30 * cos(radians),
+            y: center.y + size * 0.30 * sin(radians)))
+        details.line(
+          to: NSPoint(
+            x: center.x + size * 0.34 * cos(radians),
+            y: center.y + size * 0.34 * sin(radians)))
+      }
+      details.move(to: center)
+      details.line(to: NSPoint(x: size * 0.68, y: size * 0.68))
+      details.move(to: NSPoint(x: size * 0.42, y: size * 0.27))
+      details.line(to: NSPoint(x: size * 0.58, y: size * 0.27))
+      details.lineWidth = size * 0.085
+      details.lineCapStyle = .round
+      details.stroke()
       ink.setFill()
       NSBezierPath(
-        ovalIn: NSRect(x: size * 0.425, y: size * 0.355, width: size * 0.15, height: size * 0.15)
+        ovalIn: NSRect(
+          x: size * 0.425, y: size * 0.425, width: size * 0.15, height: size * 0.15)
       ).fill()
       return true
     }
@@ -88,7 +103,7 @@ final class MenuBarController: NSObject {
     if window == nil {
       let controller = NSHostingController(rootView: SettingsView(store: store))
       let window = NSWindow(contentViewController: controller)
-      window.title = "LLM Meter Settings"
+      window.title = L10n.text("LLM Meter Settings")
       window.styleMask = [.titled, .closable, .miniaturizable]
       window.isReleasedWhenClosed = false
       window.center()
@@ -119,18 +134,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let appItem = NSMenuItem()
     let appMenu = NSMenu()
     let settingsItem = appMenu.addItem(
-      withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+      withTitle: L10n.text("Settings…"), action: #selector(openSettings), keyEquivalent: ",")
     settingsItem.target = self
     appMenu.addItem(.separator())
     appMenu.addItem(
-      withTitle: "Quit LLM Meter", action: #selector(NSApplication.terminate(_:)),
+      withTitle: L10n.text("Quit LLM Meter"), action: #selector(NSApplication.terminate(_:)),
       keyEquivalent: "q")
     appItem.submenu = appMenu
     menu.addItem(appItem)
     let windowItem = NSMenuItem()
-    let windowMenu = NSMenu(title: "Window")
+    let windowMenu = NSMenu(title: L10n.text("Window"))
     windowMenu.addItem(
-      withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+      withTitle: L10n.text("Close"), action: #selector(NSWindow.performClose(_:)),
+      keyEquivalent: "w")
     windowItem.submenu = windowMenu
     menu.addItem(windowItem)
     NSApplication.shared.mainMenu = menu

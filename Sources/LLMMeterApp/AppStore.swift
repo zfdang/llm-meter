@@ -8,6 +8,7 @@ final class AppStore: ObservableObject {
   @Published private(set) var states: [ProviderID: ServiceState]
   @Published private(set) var message: String?
   @Published var now = Date()
+  private let clock: @Sendable () -> Date
   let storage: LocalStorage
   let coordinator: RefreshCoordinator
   private var eventTask: Task<Void, Never>?
@@ -18,8 +19,13 @@ final class AppStore: ObservableObject {
   private var sleeping = false
   private var observers: [NSObjectProtocol] = []
 
-  init(storage: LocalStorage = LocalStorage(), provider: any UsageProvider = ProviderRegistry()) {
+  init(
+    storage: LocalStorage = LocalStorage(), provider: any UsageProvider = ProviderRegistry(),
+    clock: @escaping @Sendable () -> Date = { Date() }
+  ) {
     self.storage = storage
+    self.clock = clock
+    self.now = clock()
     var settings = AppSettings()
     var snapshots: [UsageSnapshot] = []
     var errors: [String] = []
@@ -37,7 +43,8 @@ final class AppStore: ObservableObject {
         (id, ServiceState(snapshot: snapshots.first { $0.provider == id }))
       })
     message = errors.isEmpty ? nil : errors.joined(separator: "\n")
-    coordinator = RefreshCoordinator(settings: settings, snapshots: snapshots, provider: provider)
+    coordinator = RefreshCoordinator(
+      settings: settings, snapshots: snapshots, provider: provider, clock: clock)
   }
   static func screenshotPreview(
     storage: LocalStorage, snapshots: [UsageSnapshot], now: Date
@@ -63,6 +70,7 @@ final class AppStore: ObservableObject {
       for await event in coordinator.events {
         guard let self, !Task.isCancelled else { break }
         if self.states[event.provider]?.snapshot != event.state.snapshot { self.cacheDirty = true }
+        self.now = self.clock()
         self.states[event.provider] = event.state
         // Bind the default metric once, after a verified reading, rather than following an account switch.
         if self.settings.showUsage, self.settings.selectedProvider == event.provider,
@@ -83,13 +91,14 @@ final class AppStore: ObservableObject {
         if !self.refreshing { self.persistCacheIfNeeded() }
       }
     }
-    timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+    timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
       Task { @MainActor in
         guard let self, !self.sleeping else { return }
-        self.now = Date()
+        self.now = self.clock()
         await self.coordinator.refresh()
       }
     }
+    if let timer { RunLoop.main.add(timer, forMode: .common) }
     let center = NSWorkspace.shared.notificationCenter
     observers.append(
       center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) {
@@ -104,7 +113,7 @@ final class AppStore: ObservableObject {
         [weak self] _ in
         Task { @MainActor in
           self?.sleeping = false
-          self?.now = Date()
+          self?.now = self?.clock() ?? Date()
           await self?.coordinator.refresh()
         }
       })
@@ -246,49 +255,65 @@ final class AppStore: ObservableObject {
     return states[id]?.label(
       metric, now: now, interval: interval(id), remaining: settings.showRemaining) ?? "—"
   }
+  func tone(_ id: ProviderID, metric: UsageMetric?) -> UsageTone {
+    guard settings.services.first(where: { $0.provider == id })?.enabled == true else {
+      return .unknown
+    }
+    return states[id]?.tone(metric, now: now, interval: interval(id)) ?? .unknown
+  }
   var copilotMetrics: [UsageMetric] { states[.copilot]?.snapshot?.metrics ?? [] }
   func countLabel(_ metric: UsageMetric) -> String {
     guard !metric.unlimited, let limit = metric.limit, let remaining = metric.remaining,
       let unit = metric.unit
-    else { return "Monthly allowance" }
+    else { return L10n.text("Monthly allowance") }
     let amount = settings.showRemaining ? remaining : max(0, limit - remaining)
     return
-      "\(amount.formatted(.number.precision(.fractionLength(0...1)))) / \(limit.formatted(.number.precision(.fractionLength(0...1)))) \(unit)"
+      "\(amount.formatted(.number.precision(.fractionLength(0...1)).locale(L10n.locale))) / \(limit.formatted(.number.precision(.fractionLength(0...1)).locale(L10n.locale))) \(L10n.text(unit))"
   }
   func updateLabel(_ id: ProviderID) -> String {
     guard settings.services.first(where: { $0.provider == id })?.enabled == true else {
-      return "Monitoring off"
+      return L10n.text("Monitoring off")
     }
-    guard let state = states[id] else { return "Not read yet" }
-    if state.refreshing { return "Refreshing…" }
+    guard let state = states[id] else { return L10n.text("Not read yet") }
+    if state.refreshing { return L10n.text("Refreshing…") }
     if let snapshot = state.snapshot {
       return UsageDisplay.updateAge(snapshot.readAt, now: now)
     }
-    return state.error == nil ? "Not read yet" : "Unable to refresh"
+    return state.error == nil ? L10n.text("Not read yet") : L10n.text("Unable to refresh")
   }
   var panelUpdateLabel: String {
     let services = visibleServices.filter(\.enabled)
     if services.contains(where: { states[$0.provider]?.refreshing == true }) {
-      return "Refreshing…"
+      return L10n.text("Refreshing…")
     }
     guard let latest = services.compactMap({ states[$0.provider]?.snapshot?.readAt }).max() else {
-      return "Not updated yet"
+      return L10n.text("Not updated yet")
     }
     return UsageDisplay.updateAge(latest, now: now)
   }
   var panelUpdateDetails: String {
-    "Most recent successful read among visible enabled services.\n"
+    L10n.text("Most recent successful read among visible enabled services.") + "\n"
       + visibleServices.map { "\($0.provider.name): \(updateLabel($0.provider))" }.joined(
         separator: "\n")
   }
   func serviceStatusLabel(_ id: ProviderID) -> String? {
     guard settings.services.first(where: { $0.provider == id })?.enabled == true else {
-      return "Monitoring off"
+      return L10n.text("Monitoring off")
     }
-    guard let state = states[id] else { return "Not read yet" }
-    if state.refreshing { return "Refreshing…" }
-    if state.error != nil { return "Unable to refresh" }
-    return state.snapshot == nil ? "Not read yet" : nil
+    guard let state = states[id] else { return L10n.text("Not read yet") }
+    if state.refreshing { return L10n.text("Refreshing…") }
+    if state.error != nil { return L10n.text("Unable to refresh") }
+    guard let snapshot = state.snapshot else { return L10n.text("Not read yet") }
+    if !state.confirmed { return L10n.text("Startup cache · awaiting current reading") }
+    if snapshot.metrics.contains(where: { $0.pendingConfirmation }) {
+      return L10n.text("Missing from this refresh · using previous reading")
+    }
+    if snapshot.metrics.contains(where: {
+      state.freshness($0, now: now, interval: interval(id)) == .stale
+    }) {
+      return L10n.text("Reading is stale")
+    }
+    return nil
   }
   var selectedMetric: UsageMetric? {
     guard let state = states[settings.selectedProvider], let snapshot = state.snapshot,
@@ -306,50 +331,60 @@ final class AppStore: ObservableObject {
         selectedMetric, now: now, interval: interval(id),
         remaining: settings.showRemaining) ?? "—" : "—"
     return
-      "\(label)\(settings.showRemaining && label != "—" && selectedMetric?.unlimited != true ? " left" : "")"
+      settings.showRemaining && label != "—" && selectedMetric?.unlimited != true
+      ? L10n.format("%@ left", label) : label
   }
   var menuBarLabel: String {
     settings.showUsage ? "\(settings.selectedProvider.name) \(menuBarValue)" : "LLM Meter"
   }
   func tooltip(_ id: ProviderID) -> String {
-    guard let state = states[id] else { return "Not read yet" }
+    guard let state = states[id] else { return L10n.text("Not read yet") }
     var lines = [id.name]
     if settings.services.first(where: { $0.provider == id })?.enabled == false {
-      lines.append("Monitoring disabled")
+      lines.append(L10n.text("Monitoring disabled"))
     }
-    if state.refreshing { lines.append("Refreshing…") }
+    if state.refreshing { lines.append(L10n.text("Refreshing…")) }
     if let error = state.error { lines.append(error.localizedDescription) }
     if let snapshot = state.snapshot {
       lines.append(
-        state.confirmed ? snapshot.accountLabel : "Previous account reading · awaiting confirmation"
+        state.confirmed
+          ? snapshot.accountLabel : L10n.text("Cached account · current sign-in unverified")
       )
-      if let plan = snapshot.plan { lines.append("Plan: \(plan)") }
+      if let plan = snapshot.plan { lines.append(L10n.format("Plan: %@", plan)) }
       for metric in snapshot.metrics {
         let value =
           metric.percent(remaining: settings.showRemaining).map { String(format: "%.1f%%", $0) }
-          ?? "Unknown"
+          ?? L10n.text("Unknown")
         lines.append(
           metric.unlimited
-            ? "\(metric.name): Unlimited"
-            : "\(metric.name): \(value) \(settings.showRemaining ? "remaining" : "used")")
+            ? "\(L10n.text(metric.name)): \(L10n.text("Unlimited"))"
+            : "\(L10n.text(metric.name)): \(value) \(settings.showRemaining ? L10n.text("remaining") : L10n.text("used"))"
+        )
         if metric.unit != nil { lines.append(countLabel(metric)) }
         if let reset = metric.resetAt {
           lines.append(
             reset <= now
-              ? "Awaiting update after reset"
-              : "\(UsageDisplay.resetCountdown(reset, now: now)) · \(reset.formatted(date: .abbreviated, time: .shortened))"
+              ? L10n.text("Awaiting update after reset")
+              : "\(UsageDisplay.resetCountdown(reset, now: now)) · \(reset.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, locale: L10n.locale)))"
           )
         }
-        if metric.pendingConfirmation { lines.append("Retained reading · awaiting confirmation") }
+        if metric.pendingConfirmation {
+          lines.append(L10n.text("Missing from this refresh · using previous reading"))
+        }
         lines.append(UsageDisplay.updateAge(metric.readAt, now: now))
-        lines.append("Read \(metric.readAt.formatted(date: .abbreviated, time: .shortened))")
+        lines.append(
+          L10n.format(
+            "Read %@",
+            metric.readAt.formatted(
+              Date.FormatStyle(date: .abbreviated, time: .shortened, locale: L10n.locale))))
       }
     } else if state.error == nil {
-      lines.append("Not read yet")
+      lines.append(L10n.text("Not read yet"))
     }
     if id == .antigravity {
       lines.append(
-        "Quota groups are shown separately. Model quotas have no assumed window duration.")
+        L10n.text(
+          "Quota groups are shown separately. Model quotas have no assumed window duration."))
     }
     return lines.joined(separator: "\n")
   }

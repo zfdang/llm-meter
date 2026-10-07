@@ -15,15 +15,17 @@ struct UsagePanel: View {
           .foregroundStyle(Color.accentColor)
         VStack(alignment: .leading, spacing: 2) {
           Text("LLM Meter").font(.system(size: 14, weight: .semibold))
-          Text("Usage overview").font(.system(size: 11)).foregroundStyle(.secondary)
+          Text(L10n.text("Usage overview")).font(.system(size: 11)).foregroundStyle(.secondary)
         }
         Spacer()
-        Text(store.settings.showRemaining ? "Remaining" : "Used")
+        Text(store.settings.showRemaining ? L10n.text("Remaining") : L10n.text("Used"))
           .font(.system(size: 10, weight: .medium))
           .padding(.horizontal, 8).padding(.vertical, 4)
           .background(Color.primary.opacity(0.06), in: Capsule())
           .help(
-            "Green: under 50% used. Orange: 50% to below 80% used. Red: 80% or more used. Colors keep the same meaning when displaying remaining allowance. Retained or unknown readings are gray."
+            L10n.text(
+              "Green: under 50% used. Orange: 50% to below 80% used. Red: 80% or more used. Colors keep the same meaning when displaying remaining allowance. Retained or unknown readings are gray."
+            )
           )
       }.padding(16)
       Divider()
@@ -31,17 +33,18 @@ struct UsagePanel: View {
         Text(message).font(.caption).foregroundStyle(.red).padding(12)
       }
       HStack(spacing: 0) {
-        Text("SERVICE").frame(maxWidth: .infinity, alignment: .leading)
-        Text("5 HOURS").frame(width: 105, alignment: .trailing)
-        Text("WEEKLY").frame(width: 105, alignment: .trailing)
+        Text(L10n.text("SERVICE")).frame(maxWidth: .infinity, alignment: .leading)
+        Text(L10n.text("5 HOURS")).frame(width: 105, alignment: .trailing)
+        Text(L10n.text("WEEKLY")).frame(width: 105, alignment: .trailing)
       }.font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 4)
       if store.visibleServices.isEmpty {
         VStack(spacing: 8) {
           Image(systemName: "list.bullet").font(.title2).foregroundStyle(.secondary)
-          Text("No services selected").font(.headline)
-          Text("Choose which LLMs to display in Settings.").font(.caption).foregroundStyle(
-            .secondary)
+          Text(L10n.text("No services selected")).font(.headline)
+          Text(L10n.text("Choose which LLMs to display in Settings.")).font(.caption)
+            .foregroundStyle(
+              .secondary)
         }.padding(24)
       } else {
         ScrollView {
@@ -67,11 +70,14 @@ struct UsagePanel: View {
         .padding(.horizontal, 16).padding(.top, 10)
         .help(store.panelUpdateDetails)
       HStack(spacing: 8) {
-        action(store.refreshing ? "Refreshing…" : "Refresh", symbol: "arrow.clockwise") {
+        action(
+          store.refreshing ? L10n.text("Refreshing…") : L10n.text("Refresh"),
+          symbol: "arrow.clockwise"
+        ) {
           store.refresh()
         }.disabled(store.refreshing)
-        action("Settings", symbol: "gearshape", action: openSettings)
-        Button("Quit") { NSApplication.shared.terminate(nil) }
+        action(L10n.text("Settings"), symbol: "gearshape", action: openSettings)
+        Button(L10n.text("Quit")) { NSApplication.shared.terminate(nil) }
           .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.secondary)
           .padding(.horizontal, 8).padding(.vertical, 8)
       }.padding(12)
@@ -130,13 +136,14 @@ struct UsagePanel: View {
         ForEach(store.antigravityModels) { metric in
           HStack {
             VStack(alignment: .leading, spacing: 4) {
-              Text(metric.name).font(.system(size: 11, weight: .medium))
-              Text("Model quota · window unknown").font(.system(size: 10)).foregroundStyle(
-                .secondary)
+              Text(L10n.text(metric.name)).font(.system(size: 11, weight: .medium))
+              Text(L10n.text("Model quota · window unknown")).font(.system(size: 10))
+                .foregroundStyle(
+                  .secondary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 5) {
-              value(store.modelLabel(metric), used: metric.usedPercent)
+              value(store.modelLabel(metric), tone: store.tone(.antigravity, metric: metric))
               Text(UsageDisplay.resetCountdown(metric.resetAt, now: store.now)).font(
                 .system(size: 10)
               )
@@ -153,19 +160,24 @@ struct UsagePanel: View {
       HStack {
         providerHeading(.copilot)
         Spacer()
-        Text("Monthly").font(.system(size: 10)).foregroundStyle(.secondary)
+        VStack(alignment: .trailing, spacing: 3) {
+          Text(L10n.text("Monthly"))
+          if let status = store.serviceStatusLabel(.copilot) { Text(status) }
+        }.font(.system(size: 10)).foregroundStyle(.secondary)
       }.padding(.top, 10).padding(.bottom, 6)
       ForEach(store.copilotMetrics) { metric in
         HStack {
           VStack(alignment: .leading, spacing: 4) {
-            Text(metric.name).font(.system(size: 11, weight: .medium))
+            Text(L10n.text(metric.name)).font(.system(size: 11, weight: .medium))
             if !metric.unlimited {
               Text(store.countLabel(metric)).font(.system(size: 10)).foregroundStyle(.secondary)
             }
           }
           Spacer()
           VStack(alignment: .trailing, spacing: 5) {
-            value(store.metricLabel(.copilot, metric: metric), used: metric.usedPercent)
+            value(
+              store.metricLabel(.copilot, metric: metric),
+              tone: store.tone(.copilot, metric: metric))
             if !metric.unlimited {
               Text(UsageDisplay.resetCountdown(metric.resetAt, now: store.now)).font(
                 .system(size: 10)
@@ -194,38 +206,41 @@ struct UsagePanel: View {
             selected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04),
             in: RoundedRectangle(cornerRadius: 5))
       }.buttonStyle(.plain).disabled(!store.canEditSettings)
-        .help(selected ? "Shown in the menu bar" : "Show \(id.name) in the menu bar")
-        .accessibilityLabel("Show \(id.name) in the menu bar")
-        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .help(
+          selected
+            ? L10n.text("Shown in the menu bar") : L10n.format("Show %@ in the menu bar", id.name)
+        )
+        .accessibilityLabel(L10n.format("Show %@ in the menu bar", id.name))
+        .accessibilityValue(selected ? L10n.text("Selected") : L10n.text("Not selected"))
     }
   }
 
-  private func value(_ label: String, used: Double?) -> some View {
+  private func value(_ label: String, tone: UsageTone) -> some View {
     Text(label).font(.system(size: 18, weight: .medium, design: .rounded)).monospacedDigit()
-      .foregroundStyle(usageColor(label, used: used))
+      .foregroundStyle(usageColor(tone))
   }
 
-  private func usageColor(_ label: String, used: Double?) -> Color {
-    guard label != "—", !label.hasSuffix("·"), let used, used.isFinite, used >= 0 else {
-      return .secondary
+  private func usageColor(_ tone: UsageTone) -> Color {
+    switch tone {
+    case .unknown: .secondary
+    case .low: Color(nsColor: .systemGreen)
+    case .medium: Color(nsColor: .systemOrange)
+    case .high: Color(nsColor: .systemRed)
     }
-    if used >= 80 { return Color(nsColor: .systemRed) }
-    if used >= 50 { return Color(nsColor: .systemOrange) }
-    return Color(nsColor: .systemGreen)
   }
 
   private func window(_ id: ProviderID, period: MetricPeriod, scope: String? = nil) -> some View {
     VStack(alignment: .trailing, spacing: 5) {
       value(
         store.label(id, period: period, scope: scope),
-        used: store.metric(id, period: period, scope: scope)?.usedPercent)
+        tone: store.tone(id, metric: store.metric(id, period: period, scope: scope)))
       Text(store.resetLabel(id, period: period, scope: scope)).font(.system(size: 10))
         .monospacedDigit().foregroundStyle(.secondary)
     }.frame(width: 105, alignment: .trailing)
       .help(store.tooltip(id))
       .accessibilityElement(children: .ignore)
       .accessibilityLabel(
-        "\(id.name), \(period == .fiveHours ? "5 hours" : "Weekly"), \(store.label(id, period: period, scope: scope)), \(store.resetLabel(id, period: period, scope: scope))"
+        "\(id.name), \(period == .fiveHours ? L10n.text("5 hours") : L10n.text("Weekly")), \(store.label(id, period: period, scope: scope)), \(store.resetLabel(id, period: period, scope: scope))"
       )
   }
 
@@ -252,44 +267,48 @@ struct SettingsView: View {
   var body: some View {
     TabView {
       Form {
-        Picker("Display", selection: binding(\.showUsage)) {
-          Text("Default icon").tag(false)
-          Text("Service usage").tag(true)
+        Picker(L10n.text("Display"), selection: binding(\.showUsage)) {
+          Text(L10n.text("Default icon")).tag(false)
+          Text(L10n.text("Service usage")).tag(true)
         }
         Picker(
-          "Service",
+          L10n.text("Service"),
           selection: Binding(
             get: { store.settings.selectedProvider }, set: { store.selectProvider($0) })
         ) {
           ForEach(ProviderID.allCases) { Text($0.name).tag($0) }
         }.disabled(!store.settings.showUsage)
         Picker(
-          "Metric",
+          L10n.text("Metric"),
           selection: Binding(
             get: { store.settings.selectedMetricID }, set: { store.selectMetric($0) })
         ) {
           let metrics = store.states[store.settings.selectedProvider]?.snapshot?.metrics ?? []
           if !metrics.contains(where: { $0.id == store.settings.selectedMetricID }) {
-            Text("Awaiting selected metric").tag(store.settings.selectedMetricID)
+            Text(L10n.text("Awaiting selected metric")).tag(store.settings.selectedMetricID)
           }
-          ForEach(metrics) { metric in Text(metric.name).tag(metric.id) }
+          ForEach(metrics) { metric in Text(L10n.text(metric.name)).tag(metric.id) }
         }.disabled(!store.settings.showUsage)
-        Picker("Values", selection: binding(\.showRemaining)) {
-          Text("Used").tag(false)
-          Text("Remaining").tag(true)
+        Picker(L10n.text("Values"), selection: binding(\.showRemaining)) {
+          Text(L10n.text("Used")).tag(false)
+          Text(L10n.text("Remaining")).tag(true)
         }
         Text(
-          "Service usage shows the service icon and percentage. Select a metric after its first successful refresh."
+          L10n.text(
+            "Service usage shows the service icon and percentage. Select a metric after its first successful refresh."
+          )
         )
         .font(.caption).foregroundStyle(.secondary)
         if let snapshot = store.states[store.settings.selectedProvider]?.snapshot,
           store.settings.selectedAccountID != nil,
           snapshot.accountID != store.settings.selectedAccountID
         {
-          Text("The signed-in account changed. Choose a metric to bind the new account.")
+          Text(L10n.text("The signed-in account changed. Choose a metric to bind the new account."))
             .foregroundStyle(.orange)
         }
-      }.formStyle(.grouped).tabItem { Label("Menu Bar", systemImage: "menubar.rectangle") }
+      }.formStyle(.grouped).tabItem {
+        Label(L10n.text("Menu Bar"), systemImage: "menubar.rectangle")
+      }
       ScrollView {
         VStack(alignment: .leading, spacing: 16) {
           ForEach(Array(store.settings.services.enumerated()), id: \.element.id) { index, service in
@@ -302,17 +321,18 @@ struct SettingsView: View {
                 } label: {
                   Image(systemName: "arrow.up")
                 }
-                .disabled(index == 0).help("Move up")
+                .disabled(index == 0).help(L10n.text("Move up"))
                 Button {
                   store.move(service.provider, by: 1)
                 } label: {
                   Image(systemName: "arrow.down")
                 }
-                .disabled(index == store.settings.services.count - 1).help("Move down")
+                .disabled(index == store.settings.services.count - 1).help(L10n.text("Move down"))
               }
               HStack {
-                Toggle("Show in list", isOn: serviceBinding(service.provider, \.visible))
-                Toggle("Enable monitoring", isOn: serviceBinding(service.provider, \.enabled))
+                Toggle(L10n.text("Show in list"), isOn: serviceBinding(service.provider, \.visible))
+                Toggle(
+                  L10n.text("Enable monitoring"), isOn: serviceBinding(service.provider, \.enabled))
               }
               HStack {
                 TextField(
@@ -320,13 +340,14 @@ struct SettingsView: View {
                   text: serviceBinding(service.provider, \.sourcePath)
                 )
                 .textFieldStyle(.roundedBorder)
-                Button("Choose…") { choose(service.provider) }
+                Button(L10n.text("Choose…")) { choose(service.provider) }
               }
               Text(sourceDescription(service.provider)).font(.caption).foregroundStyle(.secondary)
               HStack {
-                Button("Validate / Refresh") { store.refresh(service.provider) }.disabled(
-                  !service.enabled)
-                Button("Use default source") {
+                Button(L10n.text("Validate / Refresh")) { store.refresh(service.provider) }
+                  .disabled(
+                    !service.enabled)
+                Button(L10n.text("Use default source")) {
                   store.editService(service.provider) { $0.sourcePath = "" }
                 }
               }
@@ -335,25 +356,32 @@ struct SettingsView: View {
             }
           }
         }.padding(16)
-      }.tabItem { Label("Services", systemImage: "list.bullet") }
+      }.tabItem { Label(L10n.text("Services"), systemImage: "list.bullet") }
       Form {
-        Picker("Refresh interval", selection: binding(\.refreshMinutes)) {
-          ForEach([1, 3, 5, 10], id: \.self) { Text("\($0) minutes").tag($0) }
+        Picker(L10n.text("Refresh interval"), selection: binding(\.refreshMinutes)) {
+          ForEach([1, 3, 5, 10], id: \.self) { Text(L10n.format("%@ minutes", String($0))).tag($0) }
         }
         Text(
-          "Provider minimums and rate-limit cooldowns take precedence. Claude Code refreshes at most every 5 minutes automatically."
+          L10n.text(
+            "Provider minimums and rate-limit cooldowns take precedence. Claude Code refreshes at most every 5 minutes automatically."
+          )
         )
         .font(.caption).foregroundStyle(.secondary)
         Toggle(
-          "Launch at login", isOn: Binding(get: { loginStatus == .enabled }, set: { setLogin($0) }))
+          L10n.text("Launch at login"),
+          isOn: Binding(get: { loginStatus == .enabled }, set: { setLogin($0) }))
         if loginStatus == .requiresApproval {
-          Button("Approve in Login Items…") { SMAppService.openSystemSettingsLoginItems() }
+          Button(L10n.text("Approve in Login Items…")) {
+            SMAppService.openSystemSettingsLoginItems()
+          }
         }
         if let loginError { Text(loginError).font(.caption).foregroundStyle(.red) }
-        Text("Local usage monitoring only. Credentials remain in their original sources.").font(
+        Text(
+          L10n.text("Local usage monitoring only. Credentials remain in their original sources.")
+        ).font(
           .caption
         ).foregroundStyle(.secondary)
-      }.formStyle(.grouped).tabItem { Label("General", systemImage: "gearshape") }
+      }.formStyle(.grouped).tabItem { Label(L10n.text("General"), systemImage: "gearshape") }
     }
     .padding(12).frame(width: 570, height: 480)
     .disabled(!store.canEditSettings)
@@ -386,22 +414,30 @@ struct SettingsView: View {
   }
   private func sourcePlaceholder(_ id: ProviderID) -> String {
     switch id {
-    case .codex: "Default: ~/.codex/auth.json"
-    case .claude: "Auto-detect claude executable"
-    case .antigravity: "Auto-detect running Antigravity (optional OAuth JSON)"
-    case .copilot: "Auto-detect Copilot editor / CLI sign-in"
+    case .codex: L10n.text("Default: ~/.codex/auth.json")
+    case .claude: L10n.text("Auto-detect claude executable")
+    case .antigravity: L10n.text("Auto-detect running Antigravity (optional OAuth JSON)")
+    case .copilot: L10n.text("Auto-detect Copilot editor / CLI sign-in")
     }
   }
   private func sourceDescription(_ id: ProviderID) -> String {
     switch id {
     case .codex:
-      "Uses a subscription auth.json file (including CODEX_HOME). Tokens are never renewed by LLM Meter."
+      L10n.text(
+        "Uses a subscription auth.json file (including CODEX_HOME). Tokens are never renewed by LLM Meter."
+      )
     case .claude:
-      "Requires Claude Code 2.1.285+. Runs its read-only /usage command; no model requests or tools."
+      L10n.text(
+        "Requires Claude Code 2.1.285+. Runs its read-only /usage command; no model requests or tools."
+      )
     case .antigravity:
-      "Leave blank to read the running Antigravity app's local quota status. Keep it open and signed in. Optional fallback: an OAuth JSON with a current access_token. Quota groups and model metrics can be selected in Menu Bar."
+      L10n.text(
+        "Leave blank to read the running Antigravity app's local quota status. Keep it open and signed in. Optional fallback: an OAuth JSON with a current access_token. Quota groups and model metrics can be selected in Menu Bar."
+      )
     case .copilot:
-      "Reads github.com Copilot editor sign-in or Copilot CLI config and an already accessible Keychain token. Optional single-account OAuth JSON. Monthly quotas retain AI-credit/request units; no login, token renewal, or inference requests."
+      L10n.text(
+        "Reads github.com Copilot editor sign-in or Copilot CLI config and an already accessible Keychain token. Optional single-account OAuth JSON. Monthly quotas retain AI-credit/request units; no login, token renewal, or inference requests."
+      )
     }
   }
   private func choose(_ id: ProviderID) {
@@ -410,7 +446,9 @@ struct SettingsView: View {
     panel.allowsMultipleSelection = false
     panel.showsHiddenFiles = true
     panel.message =
-      id == .claude ? "Choose the Claude Code executable" : "Choose an existing sign-in JSON file"
+      id == .claude
+      ? L10n.text("Choose the Claude Code executable")
+      : L10n.text("Choose an existing sign-in JSON file")
     if panel.runModal() == .OK, let url = panel.url {
       store.editService(id) { $0.sourcePath = url.path }
     }
@@ -425,7 +463,8 @@ struct SettingsView: View {
       loginError = nil
     } catch {
       loginError =
-        "Could not change launch at login. Check System Settings → General → Login Items."
+        L10n.text(
+          "Could not change launch at login. Check System Settings → General → Login Items.")
     }
     loginStatus = SMAppService.mainApp.status
   }

@@ -13,5 +13,6 @@ let package = Package(
     .executableTarget(
       name: "LLMMeterApp", dependencies: ["LLMMeterCore"], resources: [.copy("Resources")]),
     .testTarget(name: "LLMMeterCoreTests", dependencies: ["LLMMeterCore"]),
+    .testTarget(name: "LLMMeterAppTests", dependencies: ["LLMMeterApp"]),
   ]
 )

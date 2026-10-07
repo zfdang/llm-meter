@@ -314,7 +314,8 @@ public struct ProcessRunner: CommandRunning {
     if !configured.isEmpty {
       let path = NSString(string: configured).expandingTildeInPath
       guard manager.isExecutableFile(atPath: path) else {
-        throw MeterError.connection("The configured \(name) executable is unavailable.")
+        throw MeterError.connection(
+          ErrorMessage("The configured %@ executable is unavailable.", name))
       }
       return path
     }
@@ -322,6 +323,7 @@ public struct ProcessRunner: CommandRunning {
       let path = directory + "/" + name
       if manager.isExecutableFile(atPath: path) { return path }
     }
-    throw MeterError.connection("\(name) was not found. Choose its executable in Settings.")
+    throw MeterError.connection(
+      ErrorMessage("%@ was not found. Choose its executable in Settings.", name))
   }
 }

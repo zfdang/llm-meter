@@ -75,3 +75,28 @@ This reads enabled sources and prints success counts or sanitized errors without
 ## Icon Attribution
 
 Provider icons are adapted from [LobeHub Icons](https://github.com/lobehub/lobe-icons), licensed under MIT. The original SVGs and license are bundled with the application. Logos identify their respective services.
+
+## Language
+
+The interface follows the first language in macOS System Settings → General →
+Language & Region. Simplified Chinese (`zh-Hans`, including Chinese mainland and
+Singapore regional variants) displays Chinese; all other languages display English.
+Restart LLM Meter after changing the system language. Provider and model names remain
+as reported by the source. Settings and cached readings are language independent.
+
+<details>
+<summary>Simplified Chinese preview</summary>
+
+![Simplified Chinese usage panel](docs/images/usage-panel-zh.png)
+
+</details>
+
+<details>
+<summary>Default icon and menu bar size comparison</summary>
+
+The default mark uses a full circular gauge with a larger footprint in the same
+18-point slot. Template rendering follows the menu bar's light/dark appearance.
+
+![Previous and current default icon beside service icons](docs/images/menu-bar-icons.png)
+
+</details>

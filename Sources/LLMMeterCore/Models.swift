@@ -154,25 +154,27 @@ public struct AppSettings: Codable, Equatable, Sendable {
 }
 
 public enum MeterError: Error, LocalizedError, Equatable, Sendable {
-  case connection(String)
-  case authentication(String)
-  case unsupported(String)
-  case malformed(String)
+  case connection(ErrorMessage)
+  case authentication(ErrorMessage)
+  case unsupported(ErrorMessage)
+  case malformed(ErrorMessage)
   case rateLimited(TimeInterval)
   case network, timeout, cancelled
-  case storage(String)
+  case storage(ErrorMessage)
   public var errorDescription: String? {
     switch self {
     case .connection(let text), .authentication(let text), .unsupported(let text),
       .malformed(let text), .storage(let text):
-      text
-    case .rateLimited: "Rate limited. Waiting before retrying."
-    case .network: "Could not reach the usage source."
-    case .timeout: "The usage source timed out."
-    case .cancelled: "Refresh cancelled."
+      text.localized()
+    case .rateLimited: L10n.text("Rate limited. Waiting before retrying.")
+    case .network: L10n.text("Could not reach the usage source.")
+    case .timeout: L10n.text("The usage source timed out.")
+    case .cancelled: L10n.text("Refresh cancelled.")
     }
   }
 }
+
+public enum UsageTone: Sendable, Equatable { case unknown, low, medium, high }
 
 public enum Freshness: Sendable { case fresh, stale, expired, awaitingReset }
 
@@ -200,13 +202,19 @@ public struct ServiceState: Sendable {
     }
     return .fresh
   }
+  public func tone(_ metric: UsageMetric?, now: Date, interval: TimeInterval) -> UsageTone {
+    guard let metric, freshness(metric, now: now, interval: interval) == .fresh,
+      !metric.unlimited, let used = metric.usedPercent, used.isFinite, used >= 0
+    else { return .unknown }
+    return used >= 80 ? .high : used >= 50 ? .medium : .low
+  }
   public func label(_ metric: UsageMetric?, now: Date, interval: TimeInterval, remaining: Bool)
     -> String
   {
     guard let metric else { return "—" }
     let status = freshness(metric, now: now, interval: interval)
     if status == .expired || status == .awaitingReset { return "—" }
-    if metric.unlimited { return status == .stale ? "Unlimited·" : "Unlimited" }
+    if metric.unlimited { return L10n.text("Unlimited") + (status == .stale ? "·" : "") }
     guard let value = metric.percent(remaining: remaining) else { return "—" }
     return String(format: "%.0f%%%@", value, status == .stale ? "·" : "")
   }
