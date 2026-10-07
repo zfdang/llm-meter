@@ -3,7 +3,6 @@ name: Package macOS app
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -19,14 +18,33 @@ jobs:
     name: Apple Silicon app
     runs-on: macos-15
     timeout-minutes: 15
+    # Needed by the publish step below, which is gated to pushes to main.
+    # Fork pull requests still receive a read-only token from GitHub.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+      - name: Derive release version
+        id: version
+        run: |
+          # Date plus the commit's short revision, in the project's time zone.
+          revision="$(git rev-parse --short HEAD)"
+          stamp="$(TZ=Asia/Shanghai date +%Y.%m.%d)"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "version=$stamp-$revision" >> "$GITHUB_OUTPUT"
+          echo "build=$(TZ=Asia/Shanghai date +%Y%m%d%H%M)" >> "$GITHUB_OUTPUT"
+          echo "tag=v$stamp-$revision" >> "$GITHUB_OUTPUT"
       - name: Build and package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
         run: ./scripts/build-app.sh
-      - name: Verify architecture and signature
+      - name: Verify architecture, signature, and version
         run: |
           test "$(lipo -archs 'build/LLM Meter.app/Contents/MacOS/LLMMeter')" = arm64
           codesign --verify --strict 'build/LLM Meter.app'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            'build/LLM Meter.app/Contents/Info.plist')" = "${{ steps.version.outputs.version }}"
       - name: Generate checksum
         working-directory: build
         run: shasum -a 256 LLM-Meter-arm64.zip > LLM-Meter-arm64.zip.sha256
@@ -38,3 +56,36 @@ jobs:
             build/LLM-Meter-arm64.zip.sha256
           if-no-files-found: error
           retention-days: 30
+      - name: Publish release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          REVISION: ${{ steps.version.outputs.revision }}
+        run: |
+          notes="$(cat <<'NOTES'
+          Automated arm64 build of `main` at ${{ env.REVISION }}.
+
+          **These development builds are ad hoc signed and not notarized.** macOS may
+          block them on first launch: right-click and choose Open, or remove the
+          quarantine attribute. Public distribution requires Developer ID signing and
+          Apple notarization.
+
+          Verify the download:
+
+          ```sh
+          shasum -a 256 -c LLM-Meter-arm64.zip.sha256
+          ```
+          NOTES
+          )"
+          # Re-running the same commit refreshes the existing release's assets.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              build/LLM-Meter-arm64.zip build/LLM-Meter-arm64.zip.sha256 --clobber
+          else
+            gh release create "$TAG" \
+              --target "${{ github.sha }}" \
+              --title "$TAG" \
+              --notes "$notes" \
+              build/LLM-Meter-arm64.zip build/LLM-Meter-arm64.zip.sha256
+          fi

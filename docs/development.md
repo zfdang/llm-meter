@@ -35,7 +35,7 @@ For a faster development bundle:
 CONFIGURATION=debug ./scripts/build-app.sh
 ```
 
-The build script generates the application icon, assembles Info.plist and the executable, and verifies the bundle signature. Supply `SIGNING_IDENTITY` for a Developer ID signature. The default ad-hoc signature is for local development and does not constitute a notarized release.
+The build script generates the application icon, assembles Info.plist and the executable, and verifies the bundle signature. Set `VERSION` and optional `BUILD_NUMBER` to stamp a release build; local builds omit them and keep the committed version. Supply `SIGNING_IDENTITY` for a Developer ID signature. The default ad-hoc signature is for local development and does not constitute a notarized release.
 
 The GitHub workflow runs tests and packages an arm64 bundle on a macOS runner. CI does not use personal accounts. Its downloadable app artifact is a development build, not a notarized release.
 
@@ -135,6 +135,6 @@ The subprocess runner uses `posix_spawn` with `POSIX_SPAWN_SETPGROUP` to assign 
 
 Run `make screenshots` to rebuild the light and dark previews in `docs/images/`. Use `--export-screenshot <path> --dark` for an individual dark preview. The exporter renders the actual SwiftUI panel with deterministic fictional quotas and an isolated temporary store. It does not read personal settings, start the refresh scheduler, or query usage sources. The menu bar sample uses the same provider icon and value as the app.
 
-`ci.yml` runs strict formatting and core tests. `package.yml` builds the arm64 app, verifies architecture and its ad hoc signature, and uploads the ZIP plus SHA-256 checksum for 30 days. Both run on pull requests and main and allow manual dispatch; packaging also runs on `v*` tags. No credential secrets are required, and no release is published. Before public distribution, configure Developer ID signing and notarization, including stapling and Gatekeeper validation.
+`ci.yml` runs strict formatting and core tests. `package.yml` builds and verifies the arm64 app on pull requests and main, and can be dispatched manually. A push to `main` also publishes a GitHub Release whose tag is the build date plus the commit's short revision in `Asia/Shanghai` time, such as `v2026.10.07-3e5e7de`; the app's `CFBundleShortVersionString` carries the same value and `CFBundleVersion` the numeric stamp. Releases attach the ZIP and its SHA-256 checksum, and a re-run of the same commit replaces those assets rather than duplicating the release. Packaging no longer triggers on `v*` tags. No credential secrets are required. Before public distribution, configure Developer ID signing and notarization, including stapling and Gatekeeper validation.
 
 The minimum deployment target is macOS 13; execution on an actual macOS 13 machine and Developer ID signing/notarization remain release checks. Automatic refresh currently uses a timer; immediate network-recovery notifications are a follow-up improvement.
