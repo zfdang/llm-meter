@@ -354,11 +354,11 @@ struct SettingsView: View {
         Picker(
           L10n.text("Metric"),
           selection: Binding(
-            get: { store.settings.selectedMetricID }, set: { store.selectMetric($0) })
+            get: { store.menuBarMetricID }, set: { store.selectMetric($0) })
         ) {
-          let metrics = store.states[store.settings.selectedProvider]?.snapshot?.metrics ?? []
-          if !metrics.contains(where: { $0.id == store.settings.selectedMetricID }) {
-            Text(L10n.text("Awaiting selected metric")).tag(store.settings.selectedMetricID)
+          let metrics = store.menuBarMetrics
+          if !metrics.contains(where: { $0.id == store.menuBarMetricID }) {
+            Text(L10n.text("Awaiting selected metric")).tag(store.menuBarMetricID)
           }
           ForEach(metrics) { metric in Text(L10n.text(metric.name)).tag(metric.id) }
         }.disabled(!store.settings.showUsage)
