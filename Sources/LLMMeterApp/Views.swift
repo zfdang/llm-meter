@@ -10,14 +10,16 @@ struct UsagePanel: View {
   @State private var detailProvider: ProviderID?
 
   var body: some View {
-    if let detailProvider {
-      UsageDetailsView(
-        store: store, provider: detailProvider,
-        maximumContentHeight: maximumContentHeight
-      ) { self.detailProvider = nil }
-    } else {
-      overview
-    }
+    Group {
+      if let detailProvider {
+        UsageDetailsView(
+          store: store, provider: detailProvider,
+          maximumContentHeight: maximumContentHeight
+        ) { self.detailProvider = nil }
+      } else {
+        overview
+      }
+    }.background(Color(nsColor: .windowBackgroundColor))
   }
 
   private var overview: some View {
@@ -36,7 +38,7 @@ struct UsagePanel: View {
           .background(Color.primary.opacity(0.06), in: Capsule())
           .help(
             L10n.text(
-              "Green: under 50% used. Orange: 50% to below 80% used. Red: 80% or more used. Colors keep the same meaning when displaying remaining allowance. Retained or unknown readings are gray."
+              "Status dots: green under 50% used, amber 50% to below 80%, muted red 80% or more. Dots always reflect used allowance, including in Remaining mode. Retained or unknown readings are gray."
             )
           )
       }.padding(16)
@@ -242,8 +244,12 @@ struct UsagePanel: View {
     Button {
       detailProvider = provider
     } label: {
-      Text(label).font(.system(size: 18, weight: .medium, design: .rounded)).monospacedDigit()
-        .foregroundStyle(usageColor(tone))
+      HStack(spacing: 6) {
+        Circle().fill(usageColor(tone)).frame(width: 6, height: 6)
+          .accessibilityHidden(true)
+        Text(label).font(.system(size: 18, weight: .medium, design: .rounded)).monospacedDigit()
+          .foregroundStyle(tone == .unknown ? Color.secondary : Color.primary)
+      }
     }.buttonStyle(.plain).help(L10n.text("Click for full details"))
       .accessibilityLabel(L10n.format("View %@ details", provider.name))
       .accessibilityValue(label)
@@ -252,9 +258,9 @@ struct UsagePanel: View {
   private func usageColor(_ tone: UsageTone) -> Color {
     switch tone {
     case .unknown: .secondary
-    case .low: Color(nsColor: .systemGreen)
-    case .medium: Color(nsColor: .systemOrange)
-    case .high: Color(nsColor: .systemRed)
+    case .low: Color(nsColor: .systemGreen).opacity(0.75)
+    case .medium: Color(nsColor: .systemOrange).opacity(0.75)
+    case .high: Color(nsColor: .systemRed).opacity(0.65)
     }
   }
 

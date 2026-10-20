@@ -156,8 +156,8 @@ public enum L10n {
     "Completions": "补全",
     "completions": "次补全",
     "requests": "次请求",
-    "Green: under 50% used. Orange: 50% to below 80% used. Red: 80% or more used. Colors keep the same meaning when displaying remaining allowance. Retained or unknown readings are gray.":
-      "绿色：已用不足 50%。橙色：已用 50% 至不足 80%。红色：已用 80% 或以上。显示剩余额度时，颜色含义保持不变。保留或未知的读数显示为灰色。",
+    "Status dots: green under 50% used, amber 50% to below 80%, muted red 80% or more. Dots always reflect used allowance, including in Remaining mode. Retained or unknown readings are gray.":
+      "状态圆点：绿色表示已用不足 50%，琥珀色表示已用 50% 至不足 80%，柔和红色表示已用 80% 或以上。圆点始终表示已用比例，显示剩余额度时含义不变。保留或未知的读数显示为灰色。",
     "Show %@ in the menu bar": "在菜单栏显示 %@",
     "%@ minutes": "%@ 分钟",
     "Plan: %@": "套餐：%@",
