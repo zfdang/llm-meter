@@ -33,6 +33,7 @@ final class AppStore: ObservableObject {
       settingsWritable = false
       errors.append(error.localizedDescription)
     }
+    L10n.language = settings.language
     do { snapshots = try storage.loadCache() } catch {
       cacheWritable = false
       errors.append(error.localizedDescription)
@@ -166,6 +167,7 @@ final class AppStore: ObservableObject {
       message = error.localizedDescription
       return
     }
+    L10n.language = updated.language
     settings = updated
     Task {
       await coordinator.update(updated)

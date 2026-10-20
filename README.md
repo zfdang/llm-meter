@@ -84,11 +84,12 @@ Provider icons are adapted from [LobeHub Icons](https://github.com/lobehub/lobe-
 
 ## Language
 
-The interface follows the first language in macOS System Settings → General →
-Language & Region. Simplified Chinese (`zh-Hans`, including Chinese mainland and
-Singapore regional variants) displays Chinese; all other languages display English.
-Restart LLM Meter after changing the system language. Provider and model names remain
-as reported by the source. Settings and cached readings are language independent.
+Choose **Follow system**, **简体中文**, or **English** in Settings → General → Language.
+The default is Follow system, using the first language in macOS System Settings →
+General → Language & Region. Simplified Chinese (`zh-Hans`, including Chinese mainland
+and Singapore regional variants) displays Chinese; all other languages display English.
+An explicit choice takes effect immediately and is saved for future launches.
+Provider and model names remain as reported by the source. Cached readings are language independent.
 
 <details>
 <summary>Simplified Chinese preview</summary>

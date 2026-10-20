@@ -1,9 +1,26 @@
 import Foundation
 
-/// UI language follows the first system preference. Only Simplified Chinese is translated.
+public enum AppLanguage: String, Codable, Sendable {
+  case english = "en"
+  case simplifiedChinese = "zh-Hans"
+}
+
+/// A nil language follows the first system preference. Only Simplified Chinese is translated.
 /// Explicit script wins over region (zh-Hant-CN remains English).
 public enum L10n {
-  public static func usesSimplifiedChinese(_ languages: [String]) -> Bool {
+  private final class Selection: @unchecked Sendable {
+    let lock = NSLock()
+    var language: AppLanguage?
+  }
+  private static let selection = Selection()
+  public static var language: AppLanguage? {
+    get { selection.lock.withLock { selection.language } }
+    set { selection.lock.withLock { selection.language = newValue } }
+  }
+  public static func usesSimplifiedChinese(
+    _ languages: [String], preference: AppLanguage? = nil
+  ) -> Bool {
+    if let preference { return preference == .simplifiedChinese }
     guard let first = languages.first else { return false }
     let locale = Locale(identifier: first)
     guard locale.language.languageCode?.identifier == "zh" else { return false }
@@ -18,12 +35,15 @@ public enum L10n {
     return ["CN", "SG"].contains(locale.region?.identifier ?? "")
   }
 
-  // Changing the system language takes effect on the next launch.
-  private static let simplifiedChinese = usesSimplifiedChinese(Locale.preferredLanguages)
-  public static let locale = Locale(identifier: simplifiedChinese ? "zh_Hans_CN" : "en_US")
+  private static var simplifiedChinese: Bool {
+    usesSimplifiedChinese(Locale.preferredLanguages, preference: language)
+  }
+  public static var locale: Locale {
+    Locale(identifier: simplifiedChinese ? "zh_Hans_CN" : "en_US")
+  }
 
   public static func text(_ english: String, languages: [String]? = nil) -> String {
-    let chinese = languages.map(usesSimplifiedChinese) ?? simplifiedChinese
+    let chinese = languages.map { usesSimplifiedChinese($0) } ?? simplifiedChinese
     return chinese ? translations[english] ?? english : english
   }
 
@@ -56,6 +76,8 @@ public enum L10n {
 
   // Internal visibility lets catalog tests compare source keys and placeholder counts.
   static let translations: [String: String] = [
+    "Language": "语言",
+    "Follow system": "跟随系统",
     "Usage overview": "用量概览",
     "Remaining": "剩余",
     "Used": "已用",

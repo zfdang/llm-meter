@@ -36,6 +36,25 @@ final class MenuBarController: NSObject {
     render()
   }
   func render() {
+    window?.title = L10n.text("LLM Meter Settings")
+    if let menu = NSApplication.shared.mainMenu {
+      for menuItem in menu.items {
+        guard let submenu = menuItem.submenu else { continue }
+        if submenu.items.contains(where: { $0.action == #selector(AppDelegate.openSettings) }) {
+          submenu.items.first { $0.action == #selector(AppDelegate.openSettings) }?.title =
+            L10n.text("Settings…")
+          submenu.items.first { $0.action == #selector(NSApplication.terminate(_:)) }?.title =
+            L10n.text("Quit LLM Meter")
+        } else if submenu.items.contains(where: {
+          $0.action == #selector(NSWindow.performClose(_:))
+        }) {
+          menuItem.title = L10n.text("Window")
+          submenu.title = L10n.text("Window")
+          submenu.items.first { $0.action == #selector(NSWindow.performClose(_:)) }?.title =
+            L10n.text("Close")
+        }
+      }
+    }
     item.button?.image =
       store.settings.showUsage ? ProviderIcon.image(store.settings.selectedProvider) : Self.icon()
     item.button?.imagePosition = store.settings.showUsage ? .imageLeading : .imageOnly
@@ -132,6 +151,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       return
     }
     NSApplication.shared.setActivationPolicy(.accessory)
+    let store = AppStore()
+    self.store = store
     let menu = NSMenu()
     let appItem = NSMenuItem()
     let appMenu = NSMenu()
@@ -152,8 +173,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     windowItem.submenu = windowMenu
     menu.addItem(windowItem)
     NSApplication.shared.mainMenu = menu
-    let store = AppStore()
-    self.store = store
     controller = MenuBarController(store: store)
     store.start()
     if ProcessInfo.processInfo.arguments.contains("--settings") { controller?.showSettings() }

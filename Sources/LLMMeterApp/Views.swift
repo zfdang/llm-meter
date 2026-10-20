@@ -431,6 +431,11 @@ struct SettingsView: View {
         }.padding(16)
       }.tabItem { Label(L10n.text("Services"), systemImage: "list.bullet") }
       Form {
+        Picker(L10n.text("Language"), selection: binding(\.language)) {
+          Text(L10n.text("Follow system")).tag(AppLanguage?.none)
+          Text("简体中文").tag(AppLanguage?.some(.simplifiedChinese))
+          Text("English").tag(AppLanguage?.some(.english))
+        }
         LabeledContent(L10n.text("Version")) {
           Text(AppVersion.current.version ?? L10n.text("Development build"))
             .textSelection(.enabled)

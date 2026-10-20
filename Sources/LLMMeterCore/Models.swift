@@ -136,6 +136,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
   public var selectedAccountID: String? = nil
   public var showRemaining: Bool = false
   public var refreshMinutes: Int = 3
+  /// Missing in older settings files and nil by default: follow the system language.
+  public var language: AppLanguage? = nil
   public init() {}
   public func active(_ service: ServiceConfiguration) -> Bool {
     service.enabled && (service.visible || (showUsage && selectedProvider == service.provider))

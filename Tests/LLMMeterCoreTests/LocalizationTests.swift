@@ -102,3 +102,33 @@ func usageTonesFollowConsumptionAndRequireFreshConfirmedValues(used: Double, exp
       "Placeholder mismatch: \(key)")
   }
 }
+
+@Test func explicitLanguagePreferenceOverridesSystemAndCanReturnToAutomatic() {
+  #expect(L10n.usesSimplifiedChinese(["en-US"], preference: .simplifiedChinese))
+  #expect(!L10n.usesSimplifiedChinese(["zh-Hans-CN"], preference: .english))
+  #expect(L10n.usesSimplifiedChinese(["zh-Hans-CN"], preference: nil))
+  #expect(!L10n.usesSimplifiedChinese(["en-US"], preference: nil))
+}
+
+@Test func languagePreferencePersistsAndOlderSettingsFollowSystem() throws {
+  let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+  defer { try? FileManager.default.removeItem(at: directory) }
+  let storage = LocalStorage(directory: directory)
+  var settings = AppSettings()
+  #expect(settings.language == nil)
+  for language in [AppLanguage.english, .simplifiedChinese] {
+    settings.language = language
+    try storage.saveSettings(settings)
+    #expect(try storage.loadSettings().language == language)
+  }
+  var legacy = try #require(
+    JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
+  legacy.removeValue(forKey: "language")
+  let legacyData = try JSONSerialization.data(withJSONObject: legacy)
+  try legacyData.write(to: directory.appendingPathComponent("settings.json"))
+  #expect(try storage.loadSettings().language == nil)
+  #expect(try Data(contentsOf: directory.appendingPathComponent("settings.json")) == legacyData)
+  settings.language = nil
+  try storage.saveSettings(settings)
+  #expect(try storage.loadSettings().language == nil)
+}
