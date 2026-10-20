@@ -1,9 +1,26 @@
 import Foundation
 
-/// UI language follows the first system preference. Only Simplified Chinese is translated.
+public enum AppLanguage: String, Codable, Sendable {
+  case english = "en"
+  case simplifiedChinese = "zh-Hans"
+}
+
+/// A nil language follows the first system preference. Only Simplified Chinese is translated.
 /// Explicit script wins over region (zh-Hant-CN remains English).
 public enum L10n {
-  public static func usesSimplifiedChinese(_ languages: [String]) -> Bool {
+  private final class Selection: @unchecked Sendable {
+    let lock = NSLock()
+    var language: AppLanguage?
+  }
+  private static let selection = Selection()
+  public static var language: AppLanguage? {
+    get { selection.lock.withLock { selection.language } }
+    set { selection.lock.withLock { selection.language = newValue } }
+  }
+  public static func usesSimplifiedChinese(
+    _ languages: [String], preference: AppLanguage? = nil
+  ) -> Bool {
+    if let preference { return preference == .simplifiedChinese }
     guard let first = languages.first else { return false }
     let locale = Locale(identifier: first)
     guard locale.language.languageCode?.identifier == "zh" else { return false }
@@ -18,12 +35,15 @@ public enum L10n {
     return ["CN", "SG"].contains(locale.region?.identifier ?? "")
   }
 
-  // Changing the system language takes effect on the next launch.
-  private static let simplifiedChinese = usesSimplifiedChinese(Locale.preferredLanguages)
-  public static let locale = Locale(identifier: simplifiedChinese ? "zh_Hans_CN" : "en_US")
+  private static var simplifiedChinese: Bool {
+    usesSimplifiedChinese(Locale.preferredLanguages, preference: language)
+  }
+  public static var locale: Locale {
+    Locale(identifier: simplifiedChinese ? "zh_Hans_CN" : "en_US")
+  }
 
   public static func text(_ english: String, languages: [String]? = nil) -> String {
-    let chinese = languages.map(usesSimplifiedChinese) ?? simplifiedChinese
+    let chinese = languages.map { usesSimplifiedChinese($0) } ?? simplifiedChinese
     return chinese ? translations[english] ?? english : english
   }
 
@@ -56,6 +76,8 @@ public enum L10n {
 
   // Internal visibility lets catalog tests compare source keys and placeholder counts.
   static let translations: [String: String] = [
+    "Language": "语言",
+    "Follow system": "跟随系统",
     "Usage overview": "用量概览",
     "Remaining": "剩余",
     "Used": "已用",
@@ -156,8 +178,8 @@ public enum L10n {
     "Completions": "补全",
     "completions": "次补全",
     "requests": "次请求",
-    "Green: under 50% used. Orange: 50% to below 80% used. Red: 80% or more used. Colors keep the same meaning when displaying remaining allowance. Retained or unknown readings are gray.":
-      "绿色：已用不足 50%。橙色：已用 50% 至不足 80%。红色：已用 80% 或以上。显示剩余额度时，颜色含义保持不变。保留或未知的读数显示为灰色。",
+    "Status dots: green under 50% used, amber 50% to below 80%, muted red 80% or more. Dots always reflect used allowance, including in Remaining mode. Retained or unknown readings are gray.":
+      "状态圆点：绿色表示已用不足 50%，琥珀色表示已用 50% 至不足 80%，柔和红色表示已用 80% 或以上。圆点始终表示已用比例，显示剩余额度时含义不变。保留或未知的读数显示为灰色。",
     "Show %@ in the menu bar": "在菜单栏显示 %@",
     "%@ minutes": "%@ 分钟",
     "Plan: %@": "套餐：%@",

@@ -33,6 +33,7 @@ final class AppStore: ObservableObject {
       settingsWritable = false
       errors.append(error.localizedDescription)
     }
+    L10n.language = settings.language
     do { snapshots = try storage.loadCache() } catch {
       cacheWritable = false
       errors.append(error.localizedDescription)
@@ -81,7 +82,7 @@ final class AppStore: ObservableObject {
             settings.selectedAccountID = snapshot.accountID
             if settings.selectedMetricID == "primary",
               !snapshot.metrics.contains(where: { $0.id == "primary" }),
-              let first = snapshot.metrics.first
+              let first = Self.defaultMenuBarMetric(in: snapshot)
             {
               settings.selectedMetricID = first.id
             }
@@ -157,7 +158,7 @@ final class AppStore: ObservableObject {
     {
       updated.selectedAccountID = snapshot.accountID
       if !snapshot.metrics.contains(where: { $0.id == updated.selectedMetricID }),
-        let first = snapshot.metrics.first
+        let first = Self.defaultMenuBarMetric(in: snapshot)
       {
         updated.selectedMetricID = first.id
       }
@@ -166,6 +167,7 @@ final class AppStore: ObservableObject {
       message = error.localizedDescription
       return
     }
+    L10n.language = updated.language
     settings = updated
     Task {
       await coordinator.update(updated)
@@ -188,13 +190,19 @@ final class AppStore: ObservableObject {
       let state = states[id]
       let snapshot = state?.confirmed == true ? state?.snapshot : nil
       settings.selectedAccountID = snapshot?.accountID
-      settings.selectedMetricID = snapshot?.metrics.first?.id ?? "primary"
+      settings.selectedMetricID =
+        snapshot.flatMap { Self.defaultMenuBarMetric(in: $0) }?.id ?? "primary"
     }
   }
   func showProviderInMenuBar(_ id: ProviderID) {
     if settings.selectedProvider == id {
       // Preserve the selected metric when enabling usage mode for the same service.
-      change { $0.showUsage = true }
+      change { settings in
+        settings.showUsage = true
+        if id == .antigravity, let metric = selectedMetric {
+          settings.selectedMetricID = metric.id
+        }
+      }
     } else {
       change { settings in
         settings.showUsage = true
@@ -202,7 +210,8 @@ final class AppStore: ObservableObject {
         let state = states[id]
         let snapshot = state?.confirmed == true ? state?.snapshot : nil
         settings.selectedAccountID = snapshot?.accountID
-        settings.selectedMetricID = snapshot?.metrics.first?.id ?? "primary"
+        settings.selectedMetricID =
+          snapshot.flatMap { Self.defaultMenuBarMetric(in: $0) }?.id ?? "primary"
       }
     }
   }
@@ -315,10 +324,40 @@ final class AppStore: ObservableObject {
     }
     return nil
   }
+  static func menuBarMetrics(in snapshot: UsageSnapshot) -> [UsageMetric] {
+    guard snapshot.provider == .antigravity else { return snapshot.metrics }
+    func isGemini(_ value: String) -> Bool {
+      let words = value.lowercased().split { !$0.isLetter && !$0.isNumber }
+      return words.contains("gemini") && !words.contains("non") && !words.contains("nongemini")
+    }
+    // Prefer the reported Gemini pool; model quotas are a fallback when no pool exists.
+    let pools = snapshot.metrics.filter {
+      $0.scope?.hasPrefix("pool:") == true && isGemini($0.scope ?? "")
+    }
+    if !pools.isEmpty { return pools }
+    return snapshot.metrics.filter {
+      $0.scope?.hasPrefix("pool:") != true && (isGemini($0.name) || isGemini($0.id))
+    }
+  }
+  private static func defaultMenuBarMetric(in snapshot: UsageSnapshot) -> UsageMetric? {
+    let metrics = menuBarMetrics(in: snapshot)
+    if snapshot.provider == .antigravity {
+      return metrics.first { $0.period == .fiveHours } ?? metrics.first
+    }
+    return metrics.first
+  }
+  var menuBarMetrics: [UsageMetric] {
+    states[settings.selectedProvider]?.snapshot.map { Self.menuBarMetrics(in: $0) } ?? []
+  }
+  var menuBarMetricID: String { selectedMetric?.id ?? settings.selectedMetricID }
   var selectedMetric: UsageMetric? {
     guard let state = states[settings.selectedProvider], let snapshot = state.snapshot,
       state.confirmed, settings.selectedAccountID == snapshot.accountID
     else { return nil }
+    if snapshot.provider == .antigravity {
+      return Self.menuBarMetrics(in: snapshot).first { $0.id == settings.selectedMetricID }
+        ?? Self.defaultMenuBarMetric(in: snapshot)
+    }
     return snapshot.metrics.first { $0.id == settings.selectedMetricID }
   }
   var menuBarValue: String {
