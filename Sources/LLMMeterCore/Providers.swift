@@ -190,11 +190,21 @@ public struct ClaudeProvider: UsageProvider {
 public struct AntigravityProvider: UsageProvider {
   public let network: any HTTPTransport
   public let commands: any CommandRunning
+  let daemonDirectory: URL
   public init(
     network: any HTTPTransport = NetworkTransport(), commands: any CommandRunning = ProcessRunner()
   ) {
+    self.init(
+      network: network, commands: commands,
+      daemonDirectory: LocalAntigravityProvider.defaultDaemonDirectory)
+  }
+  init(
+    network: any HTTPTransport = NetworkTransport(), commands: any CommandRunning = ProcessRunner(),
+    daemonDirectory: URL
+  ) {
     self.network = network
     self.commands = commands
+    self.daemonDirectory = daemonDirectory
   }
   private struct Credential: Decodable {
     struct Token: Decodable {
@@ -228,7 +238,9 @@ public struct AntigravityProvider: UsageProvider {
   }
   public func fetch(configuration: ServiceConfiguration) async throws -> UsageSnapshot {
     if configuration.sourcePath.isEmpty {
-      return try await LocalAntigravityProvider(network: network, commands: commands).fetch(
+      return try await LocalAntigravityProvider(
+        network: network, commands: commands, daemonDirectory: daemonDirectory
+      ).fetch(
         configuration: configuration)
     }
     let auth = try credentials(configuration.sourcePath)
